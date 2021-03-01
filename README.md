@@ -11,12 +11,25 @@ var a; //声明变量
 print a; // 打印nil
 
 var a, b = 12.4, c = "string"; //声明多个变量
-print a; // 打印nil
-print b + 3; //打印15.4
-print c; //打印 string
+print a; // nil
+print b;  //12.4
+print c; // string
 ```
 
-2.控制语句
+2.表达式
+```javascript
+print 1 + 2; // 3
+print "abc" + "def"; // abcdef
+print 3.14 * ( 1 + 2); // 9.42
+print true ? "true" : "false" // true
+print 1, 2, 3, "abc"; // "abc"
+
+var a=0;
+print a++;
+print --a;
+```
+
+3.控制语句
 ```javascript
 var a = true;
 if (a) {
@@ -27,8 +40,8 @@ if (a) {
 
 var n = 5;
 while (n > 0) { 
-    print n;
-    n--;
+  print n;
+  n--;
 }
 ```
 4.数组
