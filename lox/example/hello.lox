@@ -1,0 +1,66 @@
+//变量赋值
+var abc = "hello,world";
+
+//条件语句
+if (abc!="") {
+  print abc;
+} else {
+  print "nothing";
+}
+
+//循环
+var n = 5;
+while (n > 0) {
+  print n;
+  n--;
+}
+
+//函数
+fun f() {
+  print "foo";
+}
+
+//类
+class Foo {
+  method() {
+    print "foo method";
+  }
+}
+
+//继承
+class Bar < Foo {
+  init(name,age, sex) {
+    this.name = name;
+    this.age = age;
+    this.sex = sex;
+  }
+  method() {
+    super.method();
+    print "bar method";
+    return this;
+  }
+  String() {
+    print "name: " + this.name + " age:" + string(this.age) + " sex:" + this.sex;
+  }
+}
+Bar("Jane", 10, "female").method().String();
+
+//列表
+var list = [5,2,1,4,3];
+print list;
+
+//一个冒泡排序的函数
+fun sort(list) {
+  var n = len(list);
+  for (var i = 0; i < n; i++) {
+    for (var j = 0; j< n-i-1; j++) {
+      if (list[j] > list[j+1]) {
+        var t = list[j];
+        list[j] = list[j+1];
+        list[j+1] = t;
+      }
+    }
+  }
+}
+sort(list);
+print list;

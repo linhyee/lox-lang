@@ -4,6 +4,10 @@
 *.dll
 *.so
 *.dylib
+lox/*.exe
+lox/.idea
+lox/tool/*.exe
+.idea
 
 # Test binary, built with `go test -c`
 *.test
