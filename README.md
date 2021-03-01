@@ -108,5 +108,5 @@ class BostonCream < Doughnut {
    print "pipe full or custard and coat with chocolate";
   }
 }
-BostonCream().cook();
+BostonCream(3,4).cook();
 ```
