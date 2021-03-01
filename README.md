@@ -74,10 +74,10 @@ c();
 //定义类
 class Boughnut {
   init(a, b) {
-  	print "构造函数"
-  	//定义成员变量
-  	this.x = a;
-  	this.y = b;
+    print "构造函数"
+    //定义成员变量
+    this.x = a;
+    this.y = b;
   }
   cook () {
     print "fry until golen brown";
