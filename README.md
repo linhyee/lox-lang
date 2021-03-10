@@ -1,5 +1,5 @@
-## toy-language
-toy language for fun
+## lox-language
+lox language from http://craftinginterpreters.com/
 
 
 ### lox语法 
