@@ -1,0 +1,132 @@
+set guifont=Powerline_Consolas:h13
+set lines=26 columns=128
+set fileencoding=utf-8
+set nobackup
+set encoding=utf-8
+set langmenu=zh_CN.UTF-8
+language message zh_CN.UTF-8
+set ambiwidth=double 
+set nu
+set nocompatible
+:hi VertSplit ctermfg=red
+filetype off
+syntax on
+set showmode
+set showcmd
+set laststatus=2
+set ruler
+set mouse=a
+set backspace=2
+set wrap
+set ve=block
+
+set expandtab
+set tabstop=2
+set softtabstop=2
+set shiftwidth=2
+set autoindent
+set showmatch
+set hlsearch
+set ignorecase
+set smartcase
+
+se noswapfile
+set autochdir
+set autoread
+set wildmenu
+
+" set the runtime path to include Vundle and initialize
+set rtp+=~/vimfiles/bundle/Vundle.vim
+
+call vundle#begin('~/vimfiles/bundle')
+" alternatively, pass a path where Vundle should install plugins
+"call vundle#begin('~/some/path/here')
+
+" let Vundle manage Vundle, required
+
+Plugin 'VundleVim/Vundle.vim'
+
+Plugin 'tpope/vim-fugitive'
+
+Plugin 'scrooloose/nerdtree'
+
+" Plugin 'fholgado/minibufexpl.vim'
+
+
+Plugin 'vim-airline/vim-airline'
+Plugin 'vim-airline/vim-airline-themes'
+
+Plugin 'fatih/vim-go'
+Plugin 'vim-erlang/vim-erlang-runtime'
+
+
+" All of your Plugins must be added before the following line
+call vundle#end()            " required
+filetype plugin indent on    " required
+" To ignore plugin indent changes, instead use:
+" filetype plugin on
+"
+" Brief help
+" :PluginList       - lists configured plugins
+" :PluginInstall    - installs plugins; append `!` to update or just :PluginUpdate
+" :PluginSearch foo - searches for foo; append `!` to refresh local cache
+" :PluginClean      - confirms removal of unused plugins; append `!` to auto-approve removal
+"
+" see :h vundle for more details or wiki for FAQ
+" Put your non-Plugin stuff after this line
+"
+
+map <F10> :NERDTreeToggle<CR>
+let NERDTreeWinSize=25
+
+let laststatus=2
+let g:airline#extensions#tabline#enabled=1 "顶部tab显示"
+let g:airline#extensions#tabline#buffer_nr_show = 1
+let g:airline#extensions#whitespace#enabled = 0
+let g:airline#extensions#whitespace#symbol = '!' 
+
+if !exists('g:airline_symbols')
+let g:airline_symbols = {}
+endif
+"let g:airline_symbols.space = "\ua0"
+"let Powerline_symbols='fancy'
+"let g:Powerline_symbols='fancy'
+"set t_Co=256
+"
+
+" powerline symbols
+let g:airline_left_sep = ''
+let g:airline_left_alt_sep = ''
+let g:airline_right_sep = ''
+let g:airline_right_alt_sep = ''
+let g:airline_symbols.branch = ''
+let g:airline_symbols.readonly = ''
+let g:airline_symbols.linenr = '☰'
+let g:airline_symbols.maxlinenr = ''
+let g:airline_symbols.dirty='⚡'
+let g:airline_powerline_fonts = 1  " 支持 powerline 字体
+let g:airline_theme='molokai'  " murmur配色不错
+map spl :set splitright<CR>:vsplit<CR>
+map sph :set nosplitright<CR>:vsplit<CR>
+map spj :set splitbelow<CR>:split<CR>
+map spk :set nosplitbelow<CR>:split<CR>
+
+nmap <tab> :bn<cr> "设置tab键映射"
+nmap bn :bn<cr>
+nmap bp :bp<cr>
+nmap bd :bd<cr>
+
+
+let g:go_fmt_command = "goimports" " 格式化将默认的 gofmt 替换
+let g:go_autodetect_gopath = 1
+let g:go_list_type = "quickfix"
+let g:go_version_warning = 1
+let g:go_highlight_types = 1
+let g:go_highlight_fields = 1
+let g:go_highlight_functions = 1
+let g:go_highlight_function_calls = 1
+let g:go_highlight_operators = 1
+let g:go_highlight_extra_types = 1
+let g:go_highlight_methods = 1
+let g:go_highlight_generate_tags = 1
+let g:godef_split=2

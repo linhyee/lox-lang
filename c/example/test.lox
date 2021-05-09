@@ -1,0 +1,10 @@
+fun a() { return b(); }
+fun b() { return c(); }
+fun c() {
+  var a = 2;
+  var b = 3;
+  return a+b;
+}
+
+var f = a();
+print f;

@@ -1,0 +1,20 @@
+{
+  "files.associations": {
+    "type_traits": "cpp",
+    "cstdlib": "c",
+    "scanner.h": "c",
+    "compiler.h": "c",
+    "vm.h": "c",
+    "memory.h": "c",
+    "value.h": "c",
+    "object.h": "c",
+    "cmath": "cpp",
+    "common.h": "c",
+    "table.h": "c",
+    "chunk.h": "c",
+    "*.tcc": "c",
+    "typeinfo": "c",
+    "stdbool.h": "c",
+    "stdlib.h": "c"
+  }
+}

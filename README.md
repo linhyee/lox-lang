@@ -1,12 +1,13 @@
 ## lox-language
-lox language from http://craftinginterpreters.com/
+lox language inspire from http://craftinginterpreters.com/
 
+使用go实现的lox语言
+添加c语言实现
 
 ### lox语法 
-使用go实现的lox语言
 
 1.变量
-```javascript
+```java
 var a; //声明变量
 print a; // 打印nil
 
@@ -17,7 +18,7 @@ print c; // string
 ```
 
 2.表达式
-```javascript
+```java
 print 1 + 2; // 3
 print "abc" + "def"; // abcdef
 print 3.14 * ( 1 + 2); // 9.42
@@ -26,11 +27,11 @@ print 1, 2, 3, "abc"; // "abc"
 
 var a=0;
 print a++;
-print --a;
+print --a;(c版本不支持前缀)
 ```
 
 3.控制语句
-```javascript
+```java
 var a = true;
 if (a) {
   print "true";
@@ -45,7 +46,7 @@ while (n > 0) {
 }
 ```
 4.数组
-```javascript
+```java
 var a = [1, 12.4, "string", false, nil];
 print a;
 
@@ -58,7 +59,7 @@ for (var i =0; i < len(a); i++) {
 ```
 
 5..函数
-```javascript
+```java
 // 函数定义
 fun fib(n) {
   if (n <= 1) return n;
@@ -72,7 +73,7 @@ for (var i =0; i <20; i++) {
 // 支持闭包
 fun makefn() {
   var count = 0;
-  return fun() {
+  return fun() { // c版本暂不支持匿名闭包
     count++;
     print count;
   }
@@ -83,7 +84,7 @@ c();
 ```
 
 6.面向对象
-```javascript
+```java
 //定义类
 class Boughnut {
   init(a, b) {
