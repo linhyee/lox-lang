@@ -1,0 +1,43 @@
+var foo = fun(a, b) {
+  print a;
+  print b;
+};
+print foo;
+
+foo(10, 20);
+
+var a, bar = fun() {
+  print "bar";
+}, c;
+
+print bar;
+
+bar();
+
+c = fun() { print "c"; };
+
+c();
+
+fun x(f, a) {
+  f(); 
+}
+
+x(fun() {
+  print "x -> f";
+}, 0);
+
+fun y(x) {
+  var n = x;
+  return fun() {
+    n = n + 1;
+    return n;
+  };
+}
+
+var y1 = y(1);
+print y1();
+print y1();
+print y1();
+print y1();
+
+(fun() { print "string"; })();

@@ -59,7 +59,7 @@ for (var i =0; i < len(a); i++) {
 }
 ```
 
-5..函数
+5.函数
 ```java
 // 函数定义
 fun fib(n) {
@@ -74,10 +74,10 @@ for (var i =0; i <20; i++) {
 // 支持闭包
 fun makefn() {
   var count = 0;
-  return fun() { // c版本暂不支持匿名闭包
+  return fun() { 
     count++;
     print count;
-  }
+  };
 }
 var c = makefn();
 c();

@@ -56,6 +56,7 @@ typedef struct {
 } Upvalue;
 
 typedef enum {
+  TYPE_LAMBDA,
   TYPE_FUNCTION,
   TYPE_INITIALIZER,
   TYPE_METHOD,
@@ -234,7 +235,9 @@ static void initCompiler(Compiler* compiler, FunctionType type) {
   compiler->function = newFunction();
   current = compiler;
 
-  if (type != TYPE_SCRIPT) {
+  if (type == TYPE_LAMBDA) {
+    current->function->name = copyString("lambda", 6);
+  } else if (type != TYPE_SCRIPT) {
     // 函数名字是贯穿运行时的,所以在堆上分配
     current->function->name = copyString(parser.previous.start,
       parser.previous.length);
@@ -292,6 +295,7 @@ static void endScope() {
 static void expression();
 static void statement();
 static void declaration();
+static void function(FunctionType type);
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 
@@ -700,6 +704,10 @@ static void this_(bool canAssign) {
   variable(false);
 }
 
+static void lambda(bool canAssign) {
+  function(TYPE_LAMBDA);
+}
+
 static void unary(bool canAssign) {
   TokenType operatoType = parser.previous.type;
 
@@ -744,7 +752,7 @@ ParseRule rules [] = {
   [TOKEN_ELSE]          = {NULL, NULL, PREC_NONE},
   [TOKEN_FALSE]         = {literal, NULL, PREC_NONE},
   [TOKEN_FOR]           = {NULL, NULL, PREC_NONE},
-  [TOKEN_FUN]           = {NULL, NULL, PREC_NONE},
+  [TOKEN_FUN]           = {lambda, NULL, PREC_NONE},
   [TOKEN_IF]            = {NULL, NULL, PREC_NONE},
   [TOKEN_NIL]           = {literal, NULL, PREC_NONE},
   [TOKEN_OR]            = {NULL, or_, PREC_OR},
