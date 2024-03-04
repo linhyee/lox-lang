@@ -15,6 +15,14 @@
     "*.tcc": "c",
     "typeinfo": "c",
     "stdbool.h": "c",
-    "stdlib.h": "c"
+    "stdlib.h": "c",
+    "__locale": "c",
+    "chrono": "c",
+    "compare": "c",
+    "complex": "c",
+    "functional": "c",
+    "locale": "c",
+    "__config": "c",
+    "atomic": "c"
   }
 }

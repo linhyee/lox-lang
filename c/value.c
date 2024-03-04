@@ -4,6 +4,14 @@
 #include "memory.h"
 #include "object.h"
 
+#define GROW_UP_ARRAY(array) do { \
+  if (array->capacity < array->count + 1) { \
+    int oldCapacity = array->capacity; \
+    array->capacity = GROW_CAPACITY(oldCapacity); \
+    array->values = GROW_ARRAY(Value, array->values, oldCapacity, array->capacity); \
+  } \
+} while(0);
+
 void initValueArray(ValueArray* array) {
   array->values = NULL;
   array->capacity = 0;
@@ -11,15 +19,41 @@ void initValueArray(ValueArray* array) {
 }
 
 void writeValueArray(ValueArray* array, Value value) {
-  if (array->capacity < array->count + 1) {
-    int oldCapacity = array->capacity;
-    array->capacity = GROW_CAPACITY(oldCapacity);
-    array->values = GROW_ARRAY(Value, array->values,
-        oldCapacity, array->capacity);
-  }
+  GROW_UP_ARRAY(array);
 
   array->values[array->count] = value;
   array->count++;
+}
+
+int insertValueArray(ValueArray* array, int index, Value value) {
+  if (index < 0 || index >= array->count) {
+    return -1;
+  }
+  GROW_UP_ARRAY(array);
+  memmove(array->values + index + 1, array->values + index, (array->count - index) * sizeof(Value));
+  array->values[index] = value;
+  array->count++;
+  return 0;
+}
+
+int removeValueArray(ValueArray* array, int index, Value* out) {
+  if (index < 0 || index >= array->count) {
+    return -1;
+  }
+  *out = array->values[index];
+  memmove(array->values + index, array->values + index + 1, (array->count - index - 1) *sizeof(Value));
+  array->count--;
+  return 0;
+}
+
+int findInValueArray(ValueArray* array, Value value) {
+  int i;
+  for (i = 0; i < array->count; ++i) {
+    if (valuesEqual(value, array->values[i])) {
+      return i;
+    }
+  }
+  return -1;
 }
 
 void freeValueArray(ValueArray* array) {
