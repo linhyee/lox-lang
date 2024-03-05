@@ -1,11 +1,11 @@
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "compiler.h"
 #include "memory.h"
 #include "vm.h"
 
 #ifdef DEBUG_LOG_GC
-#include <stdio.h>
 #include "debug.h"
 #endif
 
@@ -28,7 +28,11 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
   }
 
   void* result = realloc(pointer, newSize);
-  if (result == NULL) exit(1);
+  if (result == NULL) {
+    fprintf(stderr, "%s[%d]: realloc memory error, `result` is NULL\n",
+      __FILE__, __LINE__);
+    exit(1);
+  }
   return result;
 }
 
@@ -115,9 +119,7 @@ static void blackenObject(Obj* object) {
     break;
   case OBJ_LIST: {
     ObjList* list = (ObjList*)object;
-    for (int i = 0; i < list->count; i++) {
-      markValue(list->data[i]);
-    }
+    markArray(&list->array);
     break;
   }
   case OBJ_NATIVE:
@@ -177,7 +179,7 @@ static void freeObject(Obj* object) {
     break;
   case OBJ_LIST: {
     ObjList* list = (ObjList*)object;
-    FREE_ARRAY(Value, list->data, list->capacity);
+    freeValueArray(&list->array);
     FREE(ObjList, list);
     }
   }

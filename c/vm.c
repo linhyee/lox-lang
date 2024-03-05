@@ -43,15 +43,15 @@ static void runtimeError(const char* format, ...) {
   resetStack();
 }
 
-static Value clockNative(int argCount, Value* args) {
+static Value clockNative(int argCount, Value* args, int* errRet) {
   return NUMBER_VAL((double)clock() / CLOCKS_PER_SEC);
 }
 
-static Value lenNative(int argCount, Value* args) { 
+static Value lenNative(int argCount, Value* args, int* errRet) { 
   int n = 0;
   switch (OBJ_TYPE(args[0])) {
   case OBJ_LIST:
-    n = AS_LIST(args[0])->count;
+    n = AS_LIST(args[0])->array.count;
     break;
   case OBJ_STRING: 
     n = strlen(AS_CSTRING(args[0]));
@@ -62,6 +62,45 @@ static Value lenNative(int argCount, Value* args) {
   return NUMBER_VAL((double)n);
 }
 
+static Value typeNative(int argCount, Value* args, int* errRet) {
+  const char* s = "unknown";
+  if (IS_OBJ(args[0])) {
+    switch (OBJ_TYPE(args[0]))
+    {
+    case OBJ_BOUND_METHOD:
+    case OBJ_CLOSURE:
+    case OBJ_FUNCTION:
+      s = "function";
+      break;
+    case OBJ_CLASS:
+      s = "class";
+      break;
+    case OBJ_INSTANCE:
+      s = "object";
+      break;
+    case OBJ_LIST:
+      s = "list";
+      break;
+    case OBJ_NATIVE:
+      s = "native-function";
+      break;
+    case OBJ_STRING:
+      s = "string";
+      break;
+    case OBJ_UPVALUE:
+      s = "upvalue";
+      break;
+    }
+  } else if (IS_BOOL(args[0])) {
+    s = "boolean";
+  } else if (IS_NIL(args[0])) {
+    s = "nil";
+  } else if (IS_NUMBER(args[0])) {
+    s = "number";
+  }
+  return OBJ_VAL(copyString(s, (int)strlen(s)));
+}
+
 static void defineNative(const char* name, NativeFn function,
     int arity) {
   push(OBJ_VAL(copyString(name, (int)strlen(name))));
@@ -69,6 +108,110 @@ static void defineNative(const char* name, NativeFn function,
   tableSet(&vm.globals, AS_STRING(vm.stack[0]), vm.stack[1]);
   pop();
   pop();
+}
+
+static void defineNativeMethod(ObjClass *klass, const char* name, NativeFn fn,
+    int arity) {
+  ObjString* str = copyString(name, (int)strlen(name));
+  push(OBJ_VAL(str));
+
+  ObjNative* native = newNative(fn, arity);
+  push(OBJ_VAL(native));
+
+  tableSet(&klass->methods, AS_STRING(vm.stack[0]), vm.stack[1]);
+
+  pop(); //str
+  pop(); //native
+}
+
+static bool checkIndexBounds(const char* type, int bounds, Value index) {
+  if (!IS_NUMBER(index)) {
+    runtimeError("%s must be a number.", type);
+    return false;
+  }
+  double i = AS_NUMBER(index);
+  if (i < 0 || i >= (double)bounds) {
+    runtimeError("%s (%g) out of bounds (%d).", type, i, bounds);
+    return false;
+  }
+  if ((double)(int)i != i) {
+    runtimeError("%s (%g) must be a whole number.", type, i);
+    return false;
+  }
+  return true;
+}
+
+static int checkListIndex(Value value, Value index) {
+  ObjList *list = AS_LIST(value);
+  return checkIndexBounds("List index", list->array.count, index);
+}
+
+static Value listInsertAt(int argCount, Value* args, int* errRet) {
+  if (!checkListIndex(args[-1], args[0])) {
+    *errRet = -1;
+    return FALSE_VAL;
+  }
+  ObjList* list = AS_LIST(args[-1]);
+  int index = (int)AS_NUMBER(args[0]);
+  insertValueArray(&list->array, index, args[1]);
+  return TRUE_VAL;
+}
+
+static Value listPush(int argCount, Value* args, int* errRet) {
+  ObjList* list = AS_LIST(args[-1]);
+  writeValueArray(&list->array, args[0]);
+  return TRUE_VAL;
+}
+
+static Value listPop(int argCount, Value* args, int* errRet) {
+  ObjList* list = AS_LIST(args[-1]);
+  if (list->array.count == 0) {
+    return NIL_VAL;
+  }
+  Value value;
+  int ret = removeValueArray(&list->array, list->array.count - 1, &value);
+  if (ret < 0) {
+    *errRet = -1;
+    runtimeError("pop index `%d` error, out of bound.", list->array.count - 1);
+    return NIL_VAL;
+  }
+  return value;
+}
+
+static Value listRemove(int argCount, Value* args, int* errRet) {
+  if (!checkListIndex(args[-1], args[0])) {
+    *errRet = -1;
+    return FALSE_VAL;
+  }
+  ObjList* list = AS_LIST(args[-1]);
+  int index = (int)AS_NUMBER(args[0]);
+  Value value;
+  int ret = removeValueArray(&list->array, index, &value);
+  if (ret < 0) {
+    *errRet = -1;
+    runtimeError("remove index `%d` error, out of bound.", index);
+    return FALSE_VAL;
+  }
+  return value;
+}
+
+static Value listSize(int argCount, Value* args, int* errRet) {
+  ObjList* list = AS_LIST(args[-1]);
+  return NUMBER_VAL((double)list->array.count);
+}
+
+static void initListClass() {
+  const char str[] = "List";
+  ObjString* listClassName = copyString(str, (int)strlen(str));
+  push(OBJ_VAL(listClassName));
+  vm.listClass = newClass(AS_STRING(vm.stack[0]));
+  pop();
+
+  defineNativeMethod(vm.listClass, "insertAt", listInsertAt, 2);
+  defineNativeMethod(vm.listClass, "push", listPush, 1);
+  defineNativeMethod(vm.listClass, "pop", listPop, 0);
+  defineNativeMethod(vm.listClass, "remove", listRemove, 1);
+  defineNativeMethod(vm.listClass, "size", listSize, 0);
 }
 
 void initVM() { 
@@ -89,6 +232,9 @@ void initVM() {
 
   defineNative("clock", clockNative, 0);
   defineNative("len", lenNative, 1);
+  defineNative("type", typeNative, 1);
+
+  initListClass();
 }
 
 void freeVM() { 
@@ -155,6 +301,7 @@ static bool callValue(Value callee, int argCount) {
       }
       return true;
     }
+    case OBJ_FUNCTION:
     case OBJ_CLOSURE:
       return call(AS_CLOSURE(callee), argCount);
     case OBJ_NATIVE: {
@@ -166,7 +313,11 @@ static bool callValue(Value callee, int argCount) {
       }
 
       NativeFn native = AS_NATIVE(callee);
-      Value result = native(argCount, vm.stackTop - argCount);
+      int errRet = 0;
+      Value result = native(argCount, vm.stackTop - argCount, &errRet);
+      if (errRet != 0) {
+        return false;
+      }
       vm.stackTop -= argCount + 1;
       push(result);
       return true;
@@ -185,22 +336,29 @@ static bool invokeFromClass(ObjClass* klass, ObjString* name,
     runtimeError("undefined property '%s'.", name->chars);
     return false;
   }
-  return call(AS_CLOSURE(method), argCount);
+  return callValue(method, argCount);
 }
 
 static bool invoke(ObjString* name, int argCount) {
   Value receiver = peek(argCount);
-  if (!IS_INSTANCE(receiver)) {
-    runtimeError("only instances have methods.");
+  ObjClass* klass;
+
+  if (IS_LIST(receiver)) {
+    klass = vm.listClass;
+  } else if (IS_INSTANCE(receiver)){
+    ObjInstance* instance = AS_INSTANCE(receiver);
+    Value value;
+    if (tableGet(&instance->fields, name, &value)) {
+      vm.stackTop[-argCount - 1] = value;
+      return callValue(value, argCount);
+    }
+    klass = instance->klass;
+  } else {
+    runtimeError("only lists, instances have methods.");
     return false;
   }
-  ObjInstance* instance = AS_INSTANCE(receiver);
-  Value value;
-  if (tableGet(&instance->fields, name, &value)) {
-    vm.stackTop[-argCount - 1] = value;
-    return callValue(value, argCount);
-  }
-  return invokeFromClass(instance->klass, name, argCount);
+
+  return invokeFromClass(klass, name, argCount);
 }
 
 static bool bindMethod(ObjClass* klass, ObjString* name) {
@@ -209,7 +367,7 @@ static bool bindMethod(ObjClass* klass, ObjString* name) {
     runtimeError("undefined property '%s'.", name->chars);
     return false;
   }
-  ObjBoundMethod* bound = newBoundMethod(peek(0), AS_CLOSURE(method));
+  ObjBoundMethod* bound = newBoundMethod(peek(0), AS_OBJ(method));
   pop();
   push(OBJ_VAL(bound));
   return true;
@@ -384,11 +542,11 @@ static InterpretResult run() {
       }
       int index = (int)AS_NUMBER(pop());
       ObjList* list = AS_LIST(pop());
-      if (index < 0 || index >= list->count) {
+      if (index < 0 || index >= list->array.count) {
         runtimeError("index out of range.");
         return INTERPRET_RUNTIME_ERROR;
       }
-      push(list->data[index]);
+      push(list->array.values[index]);
       break;
     }
     case OP_SET_INDEX: { 
@@ -403,11 +561,11 @@ static InterpretResult run() {
       }
       int index = (int) AS_NUMBER(pop());
       ObjList* list = AS_LIST(peek(0));
-      if (index < 0 || index >= list->count) {
+      if (index < 0 || index >= list->array.count) {
         runtimeError("index out of range.");
         return INTERPRET_RUNTIME_ERROR;
       }
-      list->data[index] = value; 
+      list->array.values[index] = value; 
       break;
     }
     case OP_SHIFT_INDEX: {
@@ -418,15 +576,7 @@ static InterpretResult run() {
       }
 
       ObjList* list = AS_LIST(peek(0)); 
-
-      if (list->count >= list->capacity) { //扩容
-        int newCapacity = list->capacity << 1;
-        list->data = GROW_ARRAY(Value, list->data, list->capacity, 
-            newCapacity);
-        list->capacity = newCapacity;
-      }
-
-      list->data[list->count++] = value;
+      writeValueArray(&list->array, value);
       break;
     }
     case OP_GET_UPVALUE: {
@@ -440,21 +590,27 @@ static InterpretResult run() {
       break;
     }
     case OP_GET_PROPERTY: {
-      if (!IS_INSTANCE(peek(0))) {
-        runtimeError("only instances have properties.");
-        return INTERPRET_RUNTIME_ERROR;
-      }
-
-      ObjInstance* instance = AS_INSTANCE(peek(0));
+      Value receiver = peek(0);
       ObjString* name = READ_STRING();
+      ObjClass* klass;
 
-      Value value;
-      if (tableGet(&instance->fields, name, &value)) {
-        pop(); // instance
-        push(value);
-        break;
+      if (IS_LIST(receiver)) {
+        klass = vm.listClass;
+      } else if (IS_INSTANCE(receiver)) {
+        ObjInstance* instance = AS_INSTANCE(receiver);
+        Value value;
+        if (tableGet(&instance->fields, name, &value)) {
+          pop(); // instance
+          push(value);
+          break;
+        }
+        klass = instance->klass;
+      } else {
+        runtimeError("only lists and instances have properties.");
+        return INTERPRET_RUNTIME_ERROR; 
       }
-      if (!bindMethod(instance->klass, name)) {
+
+      if (!bindMethod(klass, name)) {
         return INTERPRET_RUNTIME_ERROR;
       }
       break;

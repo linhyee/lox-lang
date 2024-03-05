@@ -1,0 +1,29 @@
+var a = [];
+print a;
+
+a.push(2);
+a.push(3);
+
+var b =["a", "b"];
+
+print b;
+
+b.push("hello");
+
+print b;
+print a;
+
+b.pop();
+a.pop();
+
+print a.size();
+print b.size();
+
+b.insertAt(0, "c");
+a.insertAt(0, 4);
+
+print a;
+print b;
+
+a.remove(1);
+b.remove(1);

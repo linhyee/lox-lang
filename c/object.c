@@ -28,7 +28,7 @@ static Obj* allocateObject(size_t size, ObjType type) {
 }
 
 ObjBoundMethod* newBoundMethod(Value receiver, 
-    ObjClosure* method) {
+    Obj* method) {
   ObjBoundMethod* bound = 
     ALLOCATE_OBJ(ObjBoundMethod, OBJ_BOUND_METHOD);
   bound->receiver = receiver;
@@ -127,19 +127,18 @@ ObjString* copyString(const char* chars, int length) {
 
 ObjList* newList() {
   ObjList* list = ALLOCATE_OBJ(ObjList, OBJ_LIST);
-  list->count = 0;
-  list->capacity = 0;
-  list->data = NULL;
+  initValueArray(&list->array);
   return list;
 }
 
 void copyList(ObjList* list, Value* values, int length) { 
-  if (length > 0) {
-    list->data = ALLOCATE(Value, length);
-    list->count = length;
-    list->capacity = length;
-    memcpy(list->data, values, length * sizeof(Value));
+  if (length <= 0) {
+    return;
   }
+  list->array.values = ALLOCATE(Value, length);
+  list->array.count = length;
+  list->array.capacity = length;
+  memcpy(list->array.values, values, length * sizeof(Value));
 }
 
 ObjUpvalue* newUpvalue(Value* slot) {
@@ -152,9 +151,9 @@ ObjUpvalue* newUpvalue(Value* slot) {
 
 static void printList(ObjList* list) {
   printf("[");
-  for (int i=0; i < list->count; i++) {
-    printValue(list->data[i]);
-    if (i != list->count - 1) {
+  for (int i=0; i < list->array.count; i++) {
+    printValue(list->array.values[i]);
+    if (i != list->array.count - 1) {
       printf(",");
     }
   }

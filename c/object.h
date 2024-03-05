@@ -53,7 +53,18 @@ typedef struct {
   ObjString* name;
 } ObjFunction;
 
-typedef Value (*NativeFn)(int argCount, Value* args);
+// 为了在native里面可以调用runtimeError, 所以设置一个外部errRet用来传送业务错误来终止native调用,
+// 原因在于runtimerError里面会重置stack以及frameCount=0, 导致下面代码中frame取值出现段错误.
+// case OP_INVOKE: {
+//  ...
+//  if (!invoke(method, argCount)) {
+//    return INTERPRET_RUNTIME_ERROR;
+//  }
+//  frame = &vm.frames[vm.frameCount - 1];
+//  ...
+// }
+// 当然也可以将返回类型Value改为bool, 在native内部使push操作来作为native的执行结果
+typedef Value (*NativeFn)(int argCount, Value* args, int* errRet);
 
 typedef struct {
   Obj obj;
@@ -71,9 +82,7 @@ struct ObjString {
 
 typedef struct {
   Obj obj;
-  Value* data;
-  int count;
-  int capacity;
+  ValueArray array;
 } ObjList;
 
 
@@ -107,7 +116,7 @@ typedef struct {
 typedef struct {
   Obj obj;
   Value receiver;
-  ObjClosure* method;
+  Obj* method;
 } ObjBoundMethod;
 
 ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method);
