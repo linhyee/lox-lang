@@ -116,10 +116,11 @@ typedef struct {
 typedef struct {
   Obj obj;
   Value receiver;
-  Obj* method;
+  //ObjClosure* method;
+  Obj* method; //使用基类, 因为有methodNative
 } ObjBoundMethod;
 
-ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method);
+ObjBoundMethod* newBoundMethod(Value receiver, Obj* method);
 ObjClass* newClass(ObjString* name);
 ObjClosure* newClosure(ObjFunction* function);
 ObjFunction* newFunction();

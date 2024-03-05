@@ -4,10 +4,11 @@
 
 void *allocate_from_buffer(void *user_data, size_t n) { return user_data; }
 
+#ifdef clox_utf8_test
 int main(void) {
   char *s = "yes,我是中国人"; 
   char *p = s;
-  printf("%d %s\n", utf8size(s),s);
+  printf("%d %s\n", (int) utf8size(s), s);
   utf8_int32_t ch; 
   p = utf8codepoint(p, &ch);
   printf("%s\n", (char*)(&ch));
@@ -34,3 +35,4 @@ int main(void) {
   printf("%s\n", "国");
   return 0;
 }
+#endif

@@ -1,6 +1,6 @@
 class Scone {
   topping(first, second) {
-    print "scone with" + first + " and " + second;
+    print "scone with " + first + " and " + second;
   }
 }
 

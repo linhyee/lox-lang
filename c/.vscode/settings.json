@@ -23,6 +23,19 @@
     "functional": "c",
     "locale": "c",
     "__config": "c",
-    "atomic": "c"
-  }
+    "atomic": "c",
+    "__availability": "c",
+    "__bits": "c",
+    "__hash_table": "c",
+    "__verbose_abort": "c",
+    "exception": "c",
+    "optional": "c",
+    "string": "c",
+    "tuple": "c",
+    "variant": "c",
+    "__debug": "c",
+    "__string": "c",
+    "algorithm": "c"
+  },
+  "C_Cpp.dimInactiveRegions": false
 }
