@@ -141,6 +141,12 @@ void copyList(ObjList* list, Value* values, int length) {
   memcpy(list->array.values, values, length * sizeof(Value));
 }
 
+ObjMap* newMap() {
+  ObjMap* map = ALLOCATE_OBJ(ObjMap, OBJ_MAP);
+  initTable(&map->table);
+  return map;
+}
+
 ObjUpvalue* newUpvalue(Value* slot) {
   ObjUpvalue* upvalue = ALLOCATE_OBJ(ObjUpvalue, OBJ_UPVALUE);
   upvalue->location = slot;
@@ -158,6 +164,26 @@ static void printList(ObjList* list) {
     }
   }
   printf("]");
+}
+
+static void printMap(ObjMap* map) {
+  printf("{");
+  int first = 1;
+  for (int i=0; i < map->table.capacity; i++) {
+    Entry *entry = &map->table.entries[i];
+    if (entry->key == NULL) {
+      continue;
+    }
+    if (first) {
+      first = 0;
+    } else {
+      printf(", ");
+    }
+    printf("%.*s", entry->key->length, entry->key->chars);
+    printf(": ");
+    printValue(entry->value);
+  }
+  printf("}");
 }
 
 static void printFunction(ObjFunction* function) {
@@ -195,6 +221,9 @@ void printObject(Value value) {
   case OBJ_LIST:
     printList(AS_LIST(value));
     break;
+  case OBJ_MAP:
+    printMap(AS_MAP(value));
+    break;
   case OBJ_UPVALUE:
     printf("upvalue");
     break;
@@ -226,6 +255,9 @@ void objTypeName(ObjType type, char* out) {
     break;
   case OBJ_LIST:
     strcpy(out, "list");
+    break;
+  case OBJ_MAP:
+    strcpy(out, "map");
     break;
   case OBJ_UPVALUE:
     strcpy(out, "upvalue");

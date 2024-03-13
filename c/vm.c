@@ -81,6 +81,9 @@ static Value typeNative(int argCount, Value* args, int* errRet) {
     case OBJ_LIST:
       s = "list";
       break;
+    case OBJ_MAP:
+      s = "map";
+      break;
     case OBJ_NATIVE:
       s = "native-function";
       break;
@@ -488,7 +491,7 @@ static InterpretResult run() {
     }
     case OP_NIL:      push(NIL_VAL); break;
     case OP_TRUE:     push(BOOL_VAL(true)); break;
-    case OP_FAlSE:    push(BOOL_VAL(false)); break;
+    case OP_FALSE:    push(BOOL_VAL(false)); break;
     case OP_POP:      pop(); break;
     case OP_DUP:      push(peek(0)); break;
     case OP_GET_LOCAL: {
@@ -531,41 +534,101 @@ static InterpretResult run() {
       makeList(length);
       break;
     }
+    case OP_MAP_INIT: {
+      push(OBJ_VAL(newMap()));
+      break;
+    }
+    case OP_MAP_DATA: {
+      if (!IS_MAP(peek(2))) {
+        runtimeError("map data can only be added to a map.");
+        return INTERPRET_RUNTIME_ERROR;
+      }
+      if (!IS_STRING(peek(1))) {
+        runtimeError("map key must be a string.");
+      }
+      ObjMap* map = AS_MAP(peek(2));
+      ObjString* key = AS_STRING(peek(1));
+      tableSet(&map->table, key, peek(0));
+      pop(); // value
+      pop(); // key
+      break;
+    }
     case OP_GET_INDEX: {
-      if (!IS_NUMBER(peek(0))) {
-        runtimeError("index must be a number.");
+      if (IS_LIST(peek(1))) {
+        if (!IS_NUMBER(peek(0))) {
+          runtimeError("index must be a number.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        int index = (int)AS_NUMBER(pop());
+        ObjList* list = AS_LIST(pop());
+        if (index < 0 || index >= list->array.count) {
+          runtimeError("index out of range.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        push(list->array.values[index]);
+      } else if (IS_MAP(peek(1))) {
+        if (!IS_STRING(peek(0))) {
+          runtimeError("map can only be indexed by string.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        ObjString* key = AS_STRING(peek(0));
+        ObjMap* map = AS_MAP(peek(1));
+        Value value;
+        if (tableGet(&map->table, key, &value)) {
+          pop(); // key
+          pop(); // map
+          push(value);
+        } else {
+          runtimeError("undefined key '%s'", key->chars);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+      } else if (IS_STRING(peek(1))) {
+        ObjString* s = AS_STRING(peek(1));
+        if (!IS_NUMBER(peek(0))) {
+          runtimeError("index must be a number.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        int index = (int)AS_NUMBER(pop()); // index
+        if (index < 0 || index >= s->length) {
+          runtimeError("index out of range.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        char c = s->chars[index];
+        pop(); // string
+        push(NUMBER_VAL((double)c));
+      } else {
+        runtimeError("can only subscript list, string or index map.");
         return INTERPRET_RUNTIME_ERROR;
       }
-      if (!IS_LIST(peek(1))) {
-        runtimeError("can only subscript list.");
-        return INTERPRET_RUNTIME_ERROR;
-      }
-      int index = (int)AS_NUMBER(pop());
-      ObjList* list = AS_LIST(pop());
-      if (index < 0 || index >= list->array.count) {
-        runtimeError("index out of range.");
-        return INTERPRET_RUNTIME_ERROR;
-      }
-      push(list->array.values[index]);
       break;
     }
     case OP_SET_INDEX: { 
       Value value = pop();
-      if (!IS_NUMBER(peek(0))) {
-        runtimeError("index must be a number.");
-        return INTERPRET_RUNTIME_ERROR; 
-      }
-      if (!IS_LIST(peek(1))) {
-        runtimeError("can only subscript list.");
+      if (IS_LIST(peek(1))) {
+        if (!IS_NUMBER(peek(0))) {
+          runtimeError("index must be a number.");
+          return INTERPRET_RUNTIME_ERROR; 
+        }
+        int index = (int) AS_NUMBER(pop());
+        ObjList* list = AS_LIST(peek(0));
+        if (index < 0 || index >= list->array.count) {
+          runtimeError("index out of range.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        list->array.values[index] = value; 
+      } else if (IS_MAP(peek(1))) {
+        if (!IS_STRING(peek(0))) {
+          runtimeError("map can only be indexed by string.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        ObjString* key = AS_STRING(peek(0));
+        ObjMap* map = AS_MAP(peek(1));
+        tableSet(&map->table, key, value);
+        pop(); // key
+      } else {
+        runtimeError("can only set subscript of list or index of map.");
         return INTERPRET_RUNTIME_ERROR;
       }
-      int index = (int) AS_NUMBER(pop());
-      ObjList* list = AS_LIST(peek(0));
-      if (index < 0 || index >= list->array.count) {
-        runtimeError("index out of range.");
-        return INTERPRET_RUNTIME_ERROR;
-      }
-      list->array.values[index] = value; 
       break;
     }
     case OP_SHIFT_INDEX: {

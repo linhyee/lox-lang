@@ -515,7 +515,7 @@ static void dot(bool canAssign) {
 
 static void literal(bool canAssign) {
   switch (parser.previous.type) {
-  case TOKEN_FALSE: emitByte(OP_FAlSE); break;
+  case TOKEN_FALSE: emitByte(OP_FALSE); break;
   case TOKEN_NIL:   emitByte(OP_NIL); break;
   case TOKEN_TRUE:  emitByte(OP_TRUE); break;
   default:          return; // unreachable
@@ -537,7 +537,7 @@ static void list(bool canAssign) {
     // the element.
     expression();
     length++;
-    if (length > 255) { //因为指令栈的限制
+    if (length > 255) { //因为指令栈的限制, 可以将OP_LIST分为两个指令OP_LIST_INIT和OP_LIST_DATA解除这个限制
       error("the list constant can not have more than 255 elements.");
       return;
     }
@@ -545,6 +545,44 @@ static void list(bool canAssign) {
 
   consume(TOKEN_RIGHT_BRACKET, "expect ']' after list elements.");
   emitBytes(OP_LIST, length);
+}
+
+// static void list_(bool canAssign) {
+//   emitByte(OP_LIST_INIT);
+//   do {
+//     if (check(TOKEN_RIGHT_BRACKET)) break;
+//     // the element
+//     expression();
+//     emitByte(OP_LIST_DATA);
+//   } while(match(TOKEN_COMMA));
+
+//   consume(TOKEN_RIGHT_BRACKET, "expect ']' after list elements.");
+// }
+
+// a map literal
+static void map(bool canAssign) {
+  emitByte(OP_MAP_INIT);
+  do {
+    // stop if we hit the end of the map
+    if (check(TOKEN_RIGHT_BRACE)) break;
+
+    // the key
+    if (match(TOKEN_LEFT_BRACKET)) { // support list type key
+      expression();
+      consume(TOKEN_RIGHT_BRACKET, "expect ']' after expression.");
+    } else {
+      consume(TOKEN_IDENTIFIER, "expect identifier or '['.");
+      uint8_t constant = identifierConstant(&parser.previous);
+      emitBytes(OP_CONSTANT, constant);
+    }
+    consume(TOKEN_COLON, "expect ':' after map key.");
+
+    // the value
+    expression();
+    emitByte(OP_MAP_DATA);
+  } while(match(TOKEN_COMMA));
+
+  consume(TOKEN_RIGHT_BRACE, "expect '}' after map.");
 }
 
 static void number(bool canAssign) {
@@ -727,7 +765,7 @@ ParseRule rules [] = {
   [TOKEN_RIGHT_PAREN]   = {NULL, NULL, PREC_NONE},
   [TOKEN_LEFT_BRACKET]  = {list, subscript, PREC_CALL},
   [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE},
-  [TOKEN_LEFT_BRACE]    = {NULL, NULL, PREC_NONE},
+  [TOKEN_LEFT_BRACE]    = {map, NULL, PREC_NONE},
   [TOKEN_RIGHT_BRACE]   = {NULL, NULL, PREC_NONE},
   [TOKEN_COMMA]         = {NULL, NULL, PREC_NONE},
   [TOKEN_DOT]           = {NULL, dot, PREC_CALL},

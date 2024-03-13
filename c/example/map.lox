@@ -1,0 +1,15 @@
+var map = {};
+print map;
+
+map["foo"] = "bar";
+
+print map["foo"];
+
+var o = {
+  key: "secret",
+  fn: fun() {
+    print o["key"];
+  }
+};
+
+o["fn"]();
