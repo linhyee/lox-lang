@@ -161,6 +161,10 @@ int disassembleInstruction(Chunk* chunk, int offset) {
     return simpleInstruction("OP_RETURN", offset);
   case OP_LIST:
     return byteInstruction("OP_LIST", chunk, offset);
+  case OP_MAP_INIT:
+    return simpleInstruction("OP_MAP_INIT", offset);
+  case OP_MAP_DATA:
+    return simpleInstruction("OP_MAP_DATA", offset);
   case OP_CLASS:
     return constantInstruction("OP_CLASS", chunk, offset);
   case OP_INHERIT:
