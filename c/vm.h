@@ -15,6 +15,7 @@ typedef struct {
   // the slots field points into the VM’s value stack 
   // at the first slot that this function can use
   Value* slots;
+  Table* globals; // 所有调用帧共享同一个全局变量表（VM 全局只有一个）
 } CallFrame;
 
 typedef struct {
@@ -49,8 +50,9 @@ extern VM vm;
 
 void initVM();
 void freeVM();
-InterpretResult interpret(const char* source);
+InterpretResult interpret(const char* source, const char* path);
 void push(Value value);
 Value pop();
+Value peek(int distance);
 
 #endif

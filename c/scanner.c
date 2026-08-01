@@ -6,12 +6,6 @@
 
 typedef utf8_int32_t rune;
 
-typedef struct {
-  const char* start;
-  const char* current;
-  int line;
-} Scanner;
-
 Scanner scanner;
 
 void initScanner(const char* source) {
@@ -72,7 +66,7 @@ static bool match(rune expected) {
   return true;
 }
 
-static Token makeToken(TokenType type) {
+static Token makeToken(TokenType_ type) {
   Token token;
   token.type = type;
   token.start = scanner.start;
@@ -135,8 +129,8 @@ static void skipWhitespace() {
   }
 }
 
-static TokenType checkKeyword(int start, int length, 
-    const char* rest, TokenType type) {
+static TokenType_ checkKeyword(int start, int length, 
+    const char* rest, TokenType_ type) {
   if (scanner.current - scanner.start == start + length &&
     utf8ncmp(scanner.start + start, rest, length) == 0) {
     return type;
@@ -144,44 +138,71 @@ static TokenType checkKeyword(int start, int length,
   return TOKEN_IDENTIFIER;
 }
 
-static TokenType identifierType() {
+static TokenType_ identifierType() {
   const char* p = scanner.start;
-  rune rune;
-  p = utf8codepoint(p, &rune);
-  switch (rune) {
-  case 'a': return checkKeyword(1, 2, "nd", TOKEN_AND);
+  rune c;
+  p = utf8codepoint(p, &c);
+  switch (c) {
+  case 'a': 
+    if (scanner.current - scanner.start > 1) {
+      utf8codepoint(p, &c);
+      switch (c) {
+      case 'n': return checkKeyword(2, 1, "d", TOKEN_AND);
+      case 's': return checkKeyword(2, 0, "", TOKEN_AS);
+      }
+    }
+    break;
   case 'b': return checkKeyword(1, 4, "reak", TOKEN_BREAK);
   case 'd': return checkKeyword(1, 6, "efault", TOKEN_DEFAULT);
   case 'c':
     if (scanner.current - scanner.start > 1) {
-      utf8codepoint(p, &rune);
-      switch (rune) {
+      utf8codepoint(p, &c);
+      switch (c) {
       case 'l': return checkKeyword(2, 3, "ass", TOKEN_CLASS); 
       case 'o': return checkKeyword(2, 6, "ntinue", TOKEN_CONTINUE);
       case 'a': return checkKeyword(2, 2, "se", TOKEN_CASE);
       } 
     }
     break;
-  case 'e': return checkKeyword(1, 3, "lse", TOKEN_ELSE);
+  case 'e': 
+    if (scanner.current - scanner.start > 1) {
+      utf8codepoint(p, &c);
+      switch (c) {
+      case 'l': return checkKeyword(2, 2, "se", TOKEN_ELSE);
+      case 'x': return checkKeyword(2, 4, "port", TOKEN_EXPORT);
+      }
+    }
+    break;
   case 'f':
     if (scanner.current - scanner.start > 1) {
-      utf8codepoint(p, &rune);
-      switch (rune) {
+      utf8codepoint(p, &c);
+      switch (c) {
       case 'a': return checkKeyword(2, 3, "lse", TOKEN_FALSE);
       case 'o': return checkKeyword(2, 1, "r", TOKEN_FOR);
       case 'u': return checkKeyword(2, 1, "n", TOKEN_FUN);
       }
     }
     break;
-  case 'i': return checkKeyword(1, 1, "f", TOKEN_IF);
+  case 'i': 
+    if (scanner.current - scanner.start > 1) {
+      utf8codepoint(p, &c);
+      rune second = c;
+      if (second == 'f' && scanner.current - scanner.start == 2) {
+        return TOKEN_IF;
+      }
+      if (second == 'm' && scanner.current - scanner.start == 6) {
+        return checkKeyword(2, 4, "port", TOKEN_IMPORT);
+      }
+    }
+    return TOKEN_IDENTIFIER;
   case 'n': return checkKeyword(1, 2, "il", TOKEN_NIL);
   case 'o': return checkKeyword(1, 1, "r", TOKEN_OR);
   case 'p': return checkKeyword(1, 4, "rint", TOKEN_PRINT);
   case 'r': return checkKeyword(1, 5, "eturn", TOKEN_RETURN);
   case 's':
     if ( scanner.current - scanner.start > 1) {
-      utf8codepoint(p, &rune);
-      switch (rune) {
+      utf8codepoint(p, &c);
+      switch (c) {
       case 'w':
         return checkKeyword(2, 4, "itch", TOKEN_SWITCH);
       case 'u':
@@ -190,8 +211,8 @@ static TokenType identifierType() {
     }
   case 't':
     if (scanner.current - scanner.start > 1) {
-      utf8codepoint(p, &rune);
-      switch (rune) {
+      utf8codepoint(p, &c);
+      switch (c) {
       case 'h': return checkKeyword(2, 2, "is", TOKEN_THIS);
       case 'r': return checkKeyword(2, 2, "ue", TOKEN_TRUE);
       }

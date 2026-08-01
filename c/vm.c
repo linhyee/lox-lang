@@ -1,6 +1,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <time.h>
 
 #include "common.h"
@@ -9,6 +10,7 @@
 #include "memory.h"
 #include "vm.h"
 #include "compiler.h"
+#include "module.h"
 
 VM vm;
 
@@ -35,6 +37,10 @@ static void runtimeError(const char* format, ...) {
       function->chunk.lines[instruction]);
     if (function->name == NULL) {
       fprintf(stderr, "script\n");
+    } else if (function->module != NULL &&
+               function->module->closure == frame->closure) {
+      // Module top-level frame (script/module body), not a function call.
+      fprintf(stderr, "%s\n", function->name->chars);
     } else {
       fprintf(stderr, "%s()\n", function->name->chars);
     }
@@ -83,6 +89,9 @@ static Value typeNative(int argCount, Value* args, int* errRet) {
       break;
     case OBJ_MAP:
       s = "map";
+      break;
+    case OBJ_MODULE:
+      s = "module";
       break;
     case OBJ_NATIVE:
       s = "native-function";
@@ -222,6 +231,7 @@ void initVM() {
   vm.objects = NULL;
   vm.bytesAllocated = 0;
   vm.nextGC = 1024 * 1024;
+  vm.listClass = NULL;
 
   vm.grayCount = 0;
   vm.grayCapacity = 0;
@@ -230,6 +240,7 @@ void initVM() {
   initTable(&vm.globals);
   initTable(&vm.strings);
 
+  // Set to NULL first so GC-safe string interning can initialize this field.
   vm.initString = NULL; // copyString 可以会触发gc, 读到initString
   vm.initString = copyString("init", 4);
 
@@ -257,8 +268,8 @@ Value pop() {
   return *vm.stackTop;
 }
 
-static Value peek(int distance) {
-  return vm.stackTop[-1 -distance];
+Value peek(int distance) {
+  return vm.stackTop[-1 - distance];
 }
 
 static bool call(ObjClosure* closure, int argCount) { 
@@ -278,7 +289,35 @@ static bool call(ObjClosure* closure, int argCount) {
   frame->ip = closure->function->chunk.code;
 
   frame->slots = vm.stackTop - argCount - 1;
+  
+  if (closure->env != NULL) {
+    frame->globals = closure->env;
+  } else if (closure->module != NULL) {
+    frame->globals = &closure->module->env;
+  } else {
+    frame->globals = &vm.globals;
+  }
+  
   return true;
+}
+
+static InterpretResult run();
+static bool callValue(Value callee, int argCount);
+static bool importModule(ObjModule* module);
+static bool executeModule(ObjModule* module);
+static void finishModuleExecution(ObjModule* module, Value* result);
+
+static void clearImportStack() {
+  while (moduleLoader.currentImportStack.count > 0) {
+    popValueArray(&moduleLoader.currentImportStack);
+  }
+}
+
+static int findImportStackPath(ObjString* path) {
+  for (int i = 0; i < moduleLoader.currentImportStack.count; i++) {
+    if (valuesEqual(moduleLoader.currentImportStack.values[i], OBJ_VAL(path))) return i;
+  }
+  return -1;
 }
 
 static bool callValue(Value callee, int argCount) {
@@ -332,6 +371,43 @@ static bool callValue(Value callee, int argCount) {
   return false;
 }
 
+static bool importModule(ObjModule* module) {
+  if (module->state == MODULE_READY) {
+    if (!executeModule(module)) return false;
+  } else if (module->state == MODULE_INITIALIZED) {
+    // Already initialized; return cached module object.
+  } else if (module->state == MODULE_EXECUTING) {
+    runtimeError("Circular import while executing module '%s'.", module->path->chars);
+    return false;
+  } else if (module->state == MODULE_FAILED) {
+    runtimeError("Failed to import module '%s'.", module->path->chars);
+    return false;
+  }
+  push(OBJ_VAL(module));
+  return true;
+}
+
+static bool executeModule(ObjModule* module) {
+  module->state = MODULE_EXECUTING;
+  if (findImportStackPath(module->path) == -1) {
+    writeValueArray(&moduleLoader.currentImportStack, OBJ_VAL(module->path));
+  }
+  push(OBJ_VAL(module->closure));
+  return call(module->closure, 0);
+}
+
+static void finishModuleExecution(ObjModule* module, Value* result) {
+  if (module != NULL && module->state == MODULE_EXECUTING) {
+    module->state = MODULE_INITIALIZED;
+    if (moduleLoader.currentImportStack.count > 0 &&
+        valuesEqual(moduleLoader.currentImportStack.values[moduleLoader.currentImportStack.count - 1],
+                    OBJ_VAL(module->path))) {
+      popValueArray(&moduleLoader.currentImportStack);
+    }
+    *result = OBJ_VAL(module);
+  }
+}
+
 static bool invokeFromClass(ObjClass* klass, ObjString* name,
     int argCount) {
   Value method;
@@ -344,6 +420,28 @@ static bool invokeFromClass(ObjClass* klass, ObjString* name,
 
 static bool invoke(ObjString* name, int argCount) {
   Value receiver = peek(argCount);
+  
+  if (IS_MODULE(receiver)) {
+    ObjModule* module = AS_MODULE(receiver);
+    
+    if (module->state != MODULE_INITIALIZED) {
+      runtimeError("Module '%s' is not initialized.", module->path->chars);
+      return false;
+    }
+
+    Value value;
+    Value dummy;
+    if (tableGet(&module->exports, name, &dummy) &&
+        tableGet(&module->env, name, &value)) {
+      vm.stackTop[-argCount - 1] = value;
+      return callValue(value, argCount);
+    }
+    
+    runtimeError("undefined property '%s' in module '%s'.", 
+                 name->chars, module->path->chars);
+    return false;
+  }
+
   ObjClass* klass;
 
   if (IS_LIST(receiver)) {
@@ -451,8 +549,8 @@ void makeList(uint8_t length) {
   push(value);
 }
 
-static InterpretResult run() {
-  CallFrame* frame = &vm.frames[vm.frameCount-1];
+InterpretResult run() {
+  CallFrame* frame = &vm.frames[vm.frameCount - 1];
 
 #define READ_BYTE()     (*frame->ip++)
 #define READ_SHORT()    (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
@@ -479,9 +577,8 @@ static InterpretResult run() {
     }
     printf("\n");
     disassembleInstruction(&frame->closure->function->chunk,
-      (int)(frame->ip - frame->closure->function->chunk.code));
+                           (int)(frame->ip - frame->closure->function->chunk.code));
 #endif
-
     uint8_t instruction;
     switch (instruction = READ_BYTE()) {
     case OP_CONSTANT: {
@@ -507,26 +604,60 @@ static InterpretResult run() {
     case OP_GET_GLOBAL: {
       ObjString* name = READ_STRING();
       Value value;
-      if (!tableGet(&vm.globals, name, &value)) {
-        runtimeError("undefined variable '%s'.", name->chars);
-        return INTERPRET_RUNTIME_ERROR;
+      if (!tableGet(frame->globals, name, &value)) {
+        // Fallback to VM's built-in globals (like native functions)
+        if (frame->globals == &vm.globals || !tableGet(&vm.globals, name, &value)) {
+          runtimeError("undefined variable '%s'.", name->chars);
+          return INTERPRET_RUNTIME_ERROR;
+        }
       }
       push(value);
       break;
     }
     case OP_DEFINE_GLOBAL: {
       ObjString* name = READ_STRING();
-      tableSet(&vm.globals, name, peek(0));
+      tableSet(frame->globals, name, peek(0));
       pop();
       break;
     }
     case OP_SET_GLOBAL: {
       ObjString* name = READ_STRING();
-      if (tableSet(&vm.globals, name, peek(0))) {
-        tableDelete(&vm.globals, name);
+      if (tableSet(frame->globals, name, peek(0))) {
+        tableDelete(frame->globals, name);
         runtimeError("undefined variable '%s'.", name->chars);
         return INTERPRET_RUNTIME_ERROR;
       }
+      break;
+    }
+    case OP_IMPORT: {
+      ObjModule* module = AS_MODULE(READ_CONSTANT());
+      if (!importModule(module)) {
+        return INTERPRET_RUNTIME_ERROR;
+      }
+      frame = &vm.frames[vm.frameCount - 1];
+      break;
+    }
+    case OP_IMPORT_DYNAMIC: {
+      ObjString* pathString = AS_STRING(READ_CONSTANT());
+      int instruction_offset = (int)(frame->ip - 1 - frame->closure->function->chunk.code);
+      const char* savedBaseDir = moduleLoader.baseDir;
+      moduleLoader.baseDir = NULL;
+      if (frame->closure->module != NULL) {
+        setModuleBaseDir(frame->closure->module->path->chars);
+      } else {
+        setModuleBaseDir(".");
+      }
+      ObjModule* module = loadModule(pathString->chars, frame->closure->function->chunk.lines[instruction_offset]);
+      if (moduleLoader.baseDir != NULL) free((void*)moduleLoader.baseDir);
+      moduleLoader.baseDir = savedBaseDir;
+      if (module == NULL) {
+        runtimeError("Failed to load module '%s'.", pathString->chars);
+        return INTERPRET_RUNTIME_ERROR;
+      }
+      if (!importModule(module)) {
+        return INTERPRET_RUNTIME_ERROR;
+      }
+      frame = &vm.frames[vm.frameCount - 1];
       break;
     }
     case OP_LIST: {
@@ -623,7 +754,9 @@ static InterpretResult run() {
         }
         ObjString* key = AS_STRING(peek(0));
         ObjMap* map = AS_MAP(peek(1));
+        push(value);
         tableSet(&map->table, key, value);
+        pop();
         pop(); // key
       } else {
         runtimeError("can only set subscript of list or index of map.");
@@ -632,14 +765,14 @@ static InterpretResult run() {
       break;
     }
     case OP_SHIFT_INDEX: {
-      Value value = pop();
-      if (!IS_LIST(peek(0))) {
+      if (!IS_LIST(peek(1))) {
         runtimeError("can only push value to list.");
         return INTERPRET_RUNTIME_ERROR;
       }
 
-      ObjList* list = AS_LIST(peek(0)); 
-      writeValueArray(&list->array, value);
+      ObjList* list = AS_LIST(peek(1)); 
+      writeValueArray(&list->array, peek(0));
+      pop();
       break;
     }
     case OP_GET_UPVALUE: {
@@ -655,6 +788,37 @@ static InterpretResult run() {
     case OP_GET_PROPERTY: {
       Value receiver = peek(0);
       ObjString* name = READ_STRING();
+      
+      if (IS_MAP(receiver)) {
+        ObjMap* map = AS_MAP(receiver);
+        Value value;
+        if (tableGet(&map->table, name, &value)) {
+          pop(); // map
+          push(value);
+          break;
+        }
+      }
+      
+      if (IS_MODULE(receiver)) {
+        ObjModule* module = AS_MODULE(receiver);
+        if (module->state != MODULE_INITIALIZED) {
+          runtimeError("Module '%s' is not initialized.", module->path->chars);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        Value value;
+        Value dummy;
+        if (tableGet(&module->exports, name, &dummy) &&
+            tableGet(&module->env, name, &value)) {
+          pop(); // module
+          push(value);
+          break;
+        }
+        
+        runtimeError("undefined property '%s' in module '%s'.", 
+                     name->chars, module->path->chars);
+        return INTERPRET_RUNTIME_ERROR;
+      }
+      
       ObjClass* klass;
 
       if (IS_LIST(receiver)) {
@@ -679,6 +843,27 @@ static InterpretResult run() {
       break;
     }
     case OP_SET_PROPERTY: {
+      if (IS_MODULE(peek(1))) {
+        ObjModule* module = AS_MODULE(peek(1));
+        if (module->state != MODULE_INITIALIZED) {
+          runtimeError("Module '%s' is not initialized.", module->path->chars);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        ObjString* name = READ_STRING();
+        Value dummy;
+        if (tableGet(&module->exports, name, &dummy)) {
+          tableSet(&module->env, name, peek(0));
+          Value value = pop();
+          pop();
+          push(value);
+          break;
+        }
+        
+        runtimeError("cannot set non-exported property '%s' in module '%s'.", 
+                     name->chars, module->path->chars);
+        return INTERPRET_RUNTIME_ERROR;
+      }
+      
       if (!IS_INSTANCE(peek(1))) {
         runtimeError("only instances have fields.");
         return INTERPRET_RUNTIME_ERROR;
@@ -808,6 +993,8 @@ static InterpretResult run() {
     case OP_CLOSURE: {
       ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
       ObjClosure* closure = newClosure(function);
+      closure->module = frame->closure->module;
+      closure->env = frame->globals;
       push(OBJ_VAL(closure));
       for (int i =0; i < closure->upvalueCount; i++) {
         uint8_t isLocal = READ_BYTE();
@@ -826,17 +1013,23 @@ static InterpretResult run() {
       break;
     case OP_RETURN: {
       Value result = pop();
+
       closeUpvalues(frame->slots);
+
       vm.frameCount--;
+      
+      vm.stackTop = frame->slots;
+      ObjClosure* closure = frame->closure;
+      ObjModule* module = closure->module != NULL ? closure->module : closure->function->module;
+      if (module != NULL && module->closure == closure) finishModuleExecution(module, &result);
+
       if (vm.frameCount == 0) {
-        pop();
         return INTERPRET_OK;
       }
 
-      vm.stackTop = frame->slots;
       push(result);
 
-      frame = &vm.frames[vm.frameCount-1];
+      frame = &vm.frames[vm.frameCount - 1];
       break;
     }
     case OP_INHERIT: {
@@ -868,16 +1061,78 @@ static InterpretResult run() {
 #undef BINARY_OP
 }
 
-InterpretResult interpret(const char* source) {
-  ObjFunction* function = compile(source);
-  if (function == NULL) return INTERPRET_COMPILE_ERROR;
+InterpretResult interpret(const char* source, const char* path) {
+  // Resolve main script path to absolute path for consistent module mapping
+  char* absolutePath = resolveModulePath(path, ".");
+  if (absolutePath == NULL) {
+    return INTERPRET_COMPILE_ERROR;
+  }
+
+  bool isRepl = strcmp(path, "repl") == 0;
+  ObjString* mainPath = copyString(absolutePath, (int)strlen(absolutePath));
+  push(OBJ_VAL(mainPath));
+
+  ObjModule* mainModule = NULL;
+  bool createdModule = false;
+  Value cachedModule;
+  if (isRepl && tableGet(&moduleLoader.loadedModules, mainPath, &cachedModule)) {
+    mainModule = AS_MODULE(cachedModule);
+  } else {
+    mainModule = newModule(mainPath);
+    createdModule = true;
+  }
+  push(OBJ_VAL(mainModule));
+
+  if (createdModule) {
+    tableSet(&moduleLoader.loadedModules, mainPath, OBJ_VAL(mainModule));
+  }
+
+  ObjClosure* previousClosure = mainModule->closure;
+  ModuleState previousState = mainModule->state;
+  mainModule->state = MODULE_LOADING;
+  writeValueArray(&moduleLoader.currentImportStack, OBJ_VAL(mainPath));
+  
+  ObjFunction* function = compileModule(source, mainModule);
+  if (function == NULL) {
+    if (createdModule) {
+      tableDelete(&moduleLoader.loadedModules, mainPath);
+    } else {
+      mainModule->closure = previousClosure;
+      mainModule->state = previousState;
+    }
+    clearImportStack();
+    pop(); // mainModule
+    pop(); // mainPath
+    free(absolutePath);
+    return INTERPRET_COMPILE_ERROR;
+  }
 
   push(OBJ_VAL(function));
   ObjClosure* closure = newClosure(function);
-  pop();
-  push(OBJ_VAL(closure));
-  callValue(OBJ_VAL(closure), 0); //手动调用脚本入口
+  pop(); // function
+  
+  mainModule->closure = closure;
+  closure->module = mainModule;
+  closure->env = &mainModule->env;
+  mainModule->state = MODULE_READY;
 
-  return run();
+  pop(); // mainModule
+  pop(); // mainPath
+
+  if (!executeModule(mainModule)) {
+    mainModule->state = isRepl ? MODULE_INITIALIZED : MODULE_FAILED;
+    clearImportStack();
+    free(absolutePath);
+    return INTERPRET_RUNTIME_ERROR;
+  }
+
+  InterpretResult result = run();
+  if (result != INTERPRET_OK) {
+    mainModule->state = isRepl ? MODULE_INITIALIZED : MODULE_FAILED;
+    clearImportStack();
+  }
+  free(absolutePath);
+  return result;
 }
+
 

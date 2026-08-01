@@ -5,11 +5,22 @@ CFLAGS =-g -c -Wall -std=c99 -I.
 #table_test: table_test.o value.o memory.o object.o vm.o compiler.o scanner.o chunk.o debug.o table.o
 #	$(CC) $^ -o $@
 
-clox: main.o chunk.o memory.o debug.o value.o vm.o \
-	compiler.o scanner.o object.o table.o
+COMMON_OBJS = chunk.o memory.o debug.o value.o vm.o compiler.o scanner.o object.o table.o module.o
+
+clox: main.o $(COMMON_OBJS)
+	$(CC) $^ -g -o $@
+
+disassem: disassem.o $(COMMON_OBJS)
+	$(CC) $^ -g -o $@
+
+graphy: graphy.o scanner.o
 	$(CC) $^ -g -o $@
 
 main.o: main.c
+	$(CC) $(CFLAGS) $^
+disassem.o: disassem.c
+	$(CC) $(CFLAGS) $^
+graphy.o: graphy.c
 	$(CC) $(CFLAGS) $^
 chunk.o: chunk.c
 	$(CC) $(CFLAGS) $^
@@ -29,8 +40,10 @@ object.o: object.c
 	$(CC) $(CFLAGS) $^
 table.o: table.c
 	$(CC) $(CFLAGS) $^
+module.o: module.c
+	$(CC) $(CFLAGS) $^
 #table_test.o: table_test.c
 #	$(CC) -Dclox_table_test $(CFLAGS) $^
 
 clean:
-	$(RM) clox *.o
+	$(RM) clox disassem graphy *.o

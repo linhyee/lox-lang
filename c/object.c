@@ -7,6 +7,7 @@
 #include "value.h"
 #include "vm.h"
 #include "utf8.h"
+#include "module.h"
 
 #define ALLOCATE_OBJ(type, objectType) \
   (type*)allocateObject(sizeof(type), objectType)
@@ -53,6 +54,8 @@ ObjClosure* newClosure(ObjFunction* function) {
   closure->function = function;
   closure->upvalues = upvalues;
   closure->upvalueCount = function->upvalueCount;
+  closure->module = NULL;
+  closure->env = NULL;
   return closure;
 }
 
@@ -62,6 +65,7 @@ ObjFunction* newFunction() {
   function->arity = 0;
   function->upvalueCount = 0;
   function->name = NULL;
+  function->module = NULL;
   initChunk(&function->chunk);
   return function;
 }
@@ -71,6 +75,16 @@ ObjInstance* newInstance(ObjClass* klass) {
   instance->klass = klass;
   initTable(&instance->fields);
   return instance;
+}
+
+ObjModule* newModule(ObjString* path) {
+  ObjModule* module = ALLOCATE_OBJ(ObjModule, OBJ_MODULE);
+  module->path = path;
+  initTable(&module->env);
+  initTable(&module->exports);
+  module->closure = NULL;
+  module->state = MODULE_LOADING;
+  return module;
 }
 
 ObjNative* newNative(NativeFn function, int arity) {
@@ -224,6 +238,9 @@ void printObject(Value value) {
   case OBJ_MAP:
     printMap(AS_MAP(value));
     break;
+  case OBJ_MODULE:
+    printf("<module %s>", AS_MODULE(value)->path->chars);
+    break;
   case OBJ_UPVALUE:
     printf("upvalue");
     break;
@@ -258,6 +275,9 @@ void objTypeName(ObjType type, char* out) {
     break;
   case OBJ_MAP:
     strcpy(out, "map");
+    break;
+  case OBJ_MODULE:
+    strcpy(out, "module");
     break;
   case OBJ_UPVALUE:
     strcpy(out, "upvalue");

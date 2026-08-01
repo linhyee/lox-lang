@@ -1,0 +1,12 @@
+import "mod.lox";
+import "mod.lox";
+
+print mod;
+
+print mod.x;
+
+var a = mod.A();
+
+a.p();
+
+print a.bar();

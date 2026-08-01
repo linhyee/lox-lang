@@ -1,0 +1,34 @@
+class A {
+  init() {
+
+  }
+
+  p() {
+    print "hello";
+  }
+
+  bar() {
+    var k;
+    for (var i = 0; i < 10; i++) {
+      k =i;
+      print i;
+      if (i == 5) {
+        break;
+      }
+    }
+
+    return k;
+  }
+}
+
+fun foo() {
+  print "foo";
+}
+
+export var g = 40;
+
+export var x = [true, false, 2, 4.3, "array"];
+
+export {
+  A, foo
+}

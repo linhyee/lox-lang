@@ -4,6 +4,7 @@
 #include "compiler.h"
 #include "memory.h"
 #include "vm.h"
+#include "module.h"
 
 #ifdef DEBUG_LOG_GC
 #include "debug.h"
@@ -100,6 +101,7 @@ static void blackenObject(Obj* object) {
     for (int i = 0; i < closure->upvalueCount; i++) {
       markObject((Obj*)closure->upvalues[i]);
     }
+    markObject((Obj*)closure->module);
     break;
   }
   case OBJ_FUNCTION: {
@@ -125,6 +127,14 @@ static void blackenObject(Obj* object) {
   case OBJ_MAP: {
     ObjMap* map = (ObjMap*)object;
     markTable(&map->table);
+    break;
+  }
+  case OBJ_MODULE: {
+    ObjModule* module = (ObjModule*)object;
+    markObject((Obj*)module->path);
+    markTable(&module->env);
+    markTable(&module->exports);
+    markObject((Obj*)module->closure);
     break;
   }
   case OBJ_NATIVE:
@@ -186,13 +196,21 @@ static void freeObject(Obj* object) {
     ObjList* list = (ObjList*)object;
     freeValueArray(&list->array);
     FREE(ObjList, list);
+    break;
   }
   case OBJ_MAP: {
     ObjMap* map = (ObjMap*)object;
     freeTable(&map->table);
-    FREE(ObjList, map);
+    FREE(ObjMap, map);
     break;
-    }
+  }
+  case OBJ_MODULE: {
+    ObjModule* module = (ObjModule*)object;
+    freeTable(&module->env);
+    freeTable(&module->exports);
+    FREE(ObjModule, module);
+    break;
+  }
   }
 }
 
@@ -213,6 +231,14 @@ static void markRoots() {
   markTable(&vm.globals);
   markCompilerRoots();
   markObject((Obj*)vm.initString);
+  markObject((Obj*)vm.listClass);
+  
+  markTable(&moduleLoader.loadedModules);
+  markTable(&moduleLoader.resolvedPaths);
+
+  for (int i = 0; i < moduleLoader.currentImportStack.count; i++) {
+    markValue(moduleLoader.currentImportStack.values[i]);
+  }
 }
 
 static void traceReferences() {

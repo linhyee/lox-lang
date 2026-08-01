@@ -7,17 +7,11 @@
 #include "memory.h"
 #include "scanner.h"
 #include "utf8.h"
+#include "module.h"
 
 #ifdef DEBUG_PRINT_CODE
 #include "debug.h"
 #endif
-
-typedef struct {
-  Token current;
-  Token previous;
-  bool hadError;
-  bool panicMode;
-} Parser;
 
 // precedence levels in order from lowest to highest.
 typedef enum {
@@ -65,7 +59,6 @@ typedef enum {
 
 // local variables compiler-struct < calls and funtions enclosing-field
 typedef struct Compiler {
-  // 使用链表管理函数嵌套调用的问题
   struct Compiler* enclosing;
   ObjFunction* function;
   FunctionType type;
@@ -105,6 +98,8 @@ int innermostBreakJumpCount = 0;
 
 // dumping chunks for debuging when compiling has done
 Chunk* compilingChunk;
+
+static const char* currentSourcePath = NULL;
 
 static Chunk* currentChunk() {
   return &current->function->chunk;
@@ -147,7 +142,7 @@ static void advance() {
   }
 }
 
-static void consume(TokenType type, const char* message) {
+static void consume(TokenType_ type, const char* message) {
   if (parser.current.type == type) {
     advance();
     return;
@@ -155,11 +150,11 @@ static void consume(TokenType type, const char* message) {
   errorAtCurrent(message) ;
 }
 
-static bool check(TokenType type) {
+static bool check(TokenType_ type) {
   return parser.current.type == type;
 }
 
-static bool match(TokenType type) {
+static bool match(TokenType_ type) {
   if (!check(type)) return false;
   advance();
   return true;
@@ -275,6 +270,17 @@ static void beginScope() {
   current->scopeDepth++;
 }
 
+static ObjModule* currentModule = NULL;
+static bool isExporting = false;
+
+static void markExport(Token* name) {
+  if (currentModule == NULL) return;
+  ObjString* exportName = copyString(name->start, name->length);
+  push(OBJ_VAL(exportName));
+  tableSet(&currentModule->exports, exportName, NIL_VAL);
+  pop();
+}
+
 static void endScope() {
   current->scopeDepth--;
 
@@ -295,8 +301,11 @@ static void endScope() {
 static void expression();
 static void statement();
 static void declaration();
+static void varDeclaration();
+static void classDeclaration();
+static void funDeclaration();
 static void function(FunctionType type);
-static ParseRule* getRule(TokenType type);
+static ParseRule* getRule(TokenType_ type);
 static void parsePrecedence(Precedence precedence);
 
 static uint8_t identifierConstant(Token* name) {
@@ -441,7 +450,7 @@ static void and_(bool canAssign) {
 
 static void binary(bool canAssign) {
   // remember the operator.
-  TokenType operatorType = parser.previous.type;
+  TokenType_ operatorType = parser.previous.type;
 
   // compile the right operand.
   ParseRule* rule = getRule(operatorType); 
@@ -658,7 +667,7 @@ static void string(bool canAssign) {
 #ifdef DEBUG_TRACE_MEMORY_VERBOSE
   printf("compiler:string() FREE(char, %p) // temp buffer\n", (void*)ostr);
 #endif
-  FREE(char, ostr);
+  FREE_ARRAY(char, ostr, len + 1);
 }
 
 static void namedVariable(Token name, bool canAssign) {
@@ -747,7 +756,7 @@ static void lambda(bool canAssign) {
 }
 
 static void unary(bool canAssign) {
-  TokenType operatoType = parser.previous.type;
+  TokenType_ operatoType = parser.previous.type;
 
   // compile the operand.
   parsePrecedence(PREC_UNARY);
@@ -806,6 +815,8 @@ ParseRule rules [] = {
   [TOKEN_SWITCH]        = {NULL, NULL, PREC_NONE},
   [TOKEN_CASE]          = {NULL, NULL, PREC_NONE},
   [TOKEN_DEFAULT]       = {NULL, NULL, PREC_NONE},
+  [TOKEN_IMPORT]        = {NULL, NULL, PREC_NONE},
+  [TOKEN_EXPORT]        = {NULL, NULL, PREC_NONE},
   [TOKEN_ERROR]         = {NULL, NULL, PREC_NONE},
   [TOKEN_EOF]           = {NULL, NULL, PREC_NONE},
 };
@@ -833,7 +844,7 @@ static void parsePrecedence(Precedence precedence) {
   }
 }
 
-static ParseRule* getRule(TokenType type) {
+static ParseRule* getRule(TokenType_ type) {
   return &rules[type];
 }
 
@@ -898,14 +909,16 @@ static void method() {
 }
 
 static void classDeclaration() {
+  bool isExport = isExporting;
   consume(TOKEN_IDENTIFIER, "expect class name.");
   // 类有可能会在局部作用域声明
   Token className = parser.previous; // capture the name of the class
-  uint8_t nameConstant = identifierConstant(&parser.previous);
+  uint8_t nameConstant = identifierConstant(&className);
   declareVariable();
 
   emitBytes(OP_CLASS, nameConstant);
   defineVariable(nameConstant);
+  if (isExport && current->scopeDepth == 0) markExport(&className);
 
   ClassCompiler classCompiler;
   classCompiler.name = parser.previous;
@@ -946,17 +959,123 @@ static void classDeclaration() {
 }
 
 static void funDeclaration() {
+  bool isExport = isExporting;
   uint8_t global = parseVariable("expect function name.");
+  Token nameToken = parser.previous;
   markInitialized();
   function(TYPE_FUNCTION);
   defineVariable(global);
+  if (isExport && current->scopeDepth == 0) markExport(&nameToken);
+}
+
+static bool isAtEnd() {
+  return parser.current.type == TOKEN_EOF;
+}
+
+static void exportDeclaration() {
+  if (current->scopeDepth != 0) {
+    error("Can only export from top-level.");
+    return;
+  }
+
+  isExporting = true;
+  if (match(TOKEN_VAR)) {
+    varDeclaration();
+  } else if (match(TOKEN_FUN)) {
+    funDeclaration();
+  } else if (match(TOKEN_CLASS)) {
+    classDeclaration();
+  } else if (match(TOKEN_LEFT_BRACE)) {
+    while (!check(TOKEN_RIGHT_BRACE) && !isAtEnd()) {
+      consume(TOKEN_IDENTIFIER, "Expect exported variable name.");
+      markExport(&parser.previous);
+      if (!match(TOKEN_COMMA)) break;
+    }
+    consume(TOKEN_RIGHT_BRACE, "Expect '}' after export list.");
+  } else {
+    error("Expect 'var', 'fun', 'class', or '{' after 'export'.");
+  }
+  isExporting = false;
+}
+
+static void importDeclaration() {
+  consume(TOKEN_STRING, "Expect module path after 'import'.");
+  Token pathToken = parser.previous;
+
+  // Extract path (remove quotes)
+  int pathLength = pathToken.length - 2;
+  char* path = (char*)malloc(pathLength + 1);
+  if (path == NULL) {
+    error("Out of memory.");
+    return;
+  }
+  strncpy(path, pathToken.start + 1, pathLength);
+  path[pathLength] = '\0';
+
+  Token nameToken;
+  // Handle 'as' clause
+  if (match(TOKEN_AS)) {
+    consume(TOKEN_IDENTIFIER, "Expect identifier after 'as'.");
+    nameToken = parser.previous;
+  } else {
+    // Extract default name from path (filename without extension)
+    const char* filename = path;
+    const char* lastSlash = strrchr(filename, '/');
+    const char* lastBackslash = strrchr(filename, '\\');
+    const char* separator = lastSlash;
+    if (lastBackslash != NULL && (separator == NULL || lastBackslash > separator)) {
+      separator = lastBackslash;
+    }
+    if (separator != NULL) filename = separator + 1;
+
+    const char* dot = strrchr(filename, '.');
+    int nameLen = dot ? (int)(dot - filename) : (int)strlen(filename);
+
+    nameToken.start = filename;
+    nameToken.length = nameLen;
+    nameToken.type = TOKEN_IDENTIFIER;
+    nameToken.line = pathToken.line;
+  }
+
+  // Declare the variable to allocate a local slot if in a function.
+  // This is crucial for dynamic imports within functions.
+  declareVariable();
+
+  uint8_t varIndex = identifierConstant(&nameToken); // This is only used for global lookups, or if we need the string.
+  consume(TOKEN_SEMICOLON, "Expect ';' after import statement.");
+
+  if (current->scopeDepth == 0) {
+    ObjModule* module = loadModule(path, pathToken.line);
+    free(path);
+
+    if (module == NULL) {
+      parser.hadError = true;
+      while (!check(TOKEN_SEMICOLON) && !check(TOKEN_EOF)) {
+        advance();
+      }
+      if (match(TOKEN_SEMICOLON));
+      return;
+    }
+    emitBytes(OP_IMPORT, makeConstant(OBJ_VAL(module)));
+  } else {
+    uint8_t pathConstant = makeConstant(OBJ_VAL(copyString(path, pathLength)));
+    emitBytes(OP_IMPORT_DYNAMIC, pathConstant);
+    free(path);
+  }
+
+  // Define variable for the module in current scope
+  defineVariable(varIndex);
 }
 
 static void varDeclaration() {
   uint8_t global;
+  bool isExport = isExporting;
+  Token nameToken;
+  
 decl:
   global = parseVariable(parser.previous.type == TOKEN_COMMA ? 
     "expect ';' after declaration." : "expect variable name." );
+  nameToken = parser.previous;
 
   if (match(TOKEN_EQUAL)) {
     expression();
@@ -965,6 +1084,7 @@ decl:
   }
 
   defineVariable(global);
+  if (isExport && current->scopeDepth == 0) markExport(&nameToken);
 
   if (match(TOKEN_COMMA)) {
     goto decl;
@@ -1056,7 +1176,7 @@ static void forStatement() {
   printf("compiler:forStatement() FREE(int, %p) // innermostBreakJumps\n",
     innermostBreakJumps);
 #endif
-  FREE(int, innermostBreakJumps);
+  FREE_ARRAY(int, innermostBreakJumps, MAX_BREAKS_PER_SCOPE);
 
   innermostBreakScopeStart = surroundingBreakScopeStart;
   innermostBreakScopeDepth = surroundingBreakScopeDepth;
@@ -1104,7 +1224,8 @@ static void ifStatement() {
   consume(TOKEN_RIGHT_PAREN, "expect ')' after condition.");
 
   int thenJump = emitJump(OP_JUMP_IF_FALSE);
-  emitByte(OP_POP); //将判断表达式的值弹出
+  // Discard the evaluated condition value.
+  emitByte(OP_POP);
   statement();
 
   int elseJump = emitJump(OP_JUMP); // elseJump结束边界 
@@ -1126,6 +1247,7 @@ static void returnStatement() {
   if (current->type == TYPE_SCRIPT) {
     error("can't return from top-level code.");
   }
+  
   if (match(TOKEN_SEMICOLON)) {
     emitReturn();
   } else {
@@ -1164,7 +1286,7 @@ static void switchStatement() {
 
   while (!match(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
     if (match(TOKEN_CASE) || match(TOKEN_DEFAULT)) {
-      TokenType caseType = parser.previous.type;
+      TokenType_ caseType = parser.previous.type;
 
       if(state == 2) {
         error("can't have cases after the default case.");
@@ -1233,7 +1355,7 @@ static void switchStatement() {
   printf("compiler:switchStatement() FREE(int, %p) // innermostBreakJumps\n",
     (void*) innermostBreakJumps);
 #endif
-  FREE(int, innermostBreakJumps);
+  FREE_ARRAY(int, innermostBreakJumps, MAX_BREAKS_PER_SCOPE);
 
   innermostBreakScopeStart = surroundingBreakScopeStart;
   innermostBreakScopeDepth = surroundingBreakScopeDepth;
@@ -1292,7 +1414,7 @@ static void whileStatement() {
   printf("compiler:forStatement() FREE(int, %p) // innermostBreakJumps\n",
     innermostBreakJumps);
 #endif
-  FREE(int, innermostBreakJumps);
+  FREE_ARRAY(int, innermostBreakJumps, MAX_BREAKS_PER_SCOPE);
 
   innermostBreakScopeStart = surroundingBreakScopeStart;
   innermostBreakScopeDepth = surroundingBreakScopeDepth;
@@ -1325,15 +1447,20 @@ static void synchronize() {
 }
 
 static void declaration() {
-  if (match(TOKEN_CLASS)) { 
+  if (match(TOKEN_IMPORT)) {
+    importDeclaration();
+  } else if (match(TOKEN_EXPORT)) {
+    exportDeclaration();
+  } else if (match(TOKEN_CLASS)) {
     classDeclaration();
-  } else if(match(TOKEN_FUN)) {
+  } else if (match(TOKEN_FUN)) {
     funDeclaration();
   } else if (match(TOKEN_VAR)) {
     varDeclaration();
-  }  else {
+  } else {
     statement();
   }
+
   if (parser.panicMode) synchronize();
 }
 
@@ -1364,10 +1491,16 @@ static void statement() {
   }
 }
 
-ObjFunction* compile(const char* source) {
+ObjFunction* compileModule(const char* source, ObjModule* module) {
   initScanner(source);
   Compiler compiler;
   initCompiler(&compiler, TYPE_SCRIPT);
+  
+  compiler.function->name = module->path;
+  compiler.function->module = module;
+
+  ObjModule* savedModule = currentModule;
+  currentModule = module;
 
   parser.hadError = false;
   parser.panicMode = false;
@@ -1376,9 +1509,11 @@ ObjFunction* compile(const char* source) {
 
   while (!match(TOKEN_EOF)) {
     declaration();
-  } 
+  }
 
   ObjFunction* function = endCompiler();
+  
+  currentModule = savedModule;
   return parser.hadError ? NULL : function;
 }
 
@@ -1388,6 +1523,11 @@ void markCompilerRoots() {
     markObject((Obj*)compiler->function);
     compiler = compiler->enclosing;
   }
+}
+
+void setCompilerSource(const char* filePath) {
+  currentSourcePath = filePath;
+  setModuleBaseDir(filePath);
 }
 
 void printTokens(const char* source) {

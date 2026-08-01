@@ -91,6 +91,7 @@ void writeValueArray(ValueArray* array, Value value);
 int insertValueArray(ValueArray* array, int index, Value value);
 int removeValueArray(ValueArray* array, int index, Value* out);
 int findInValueArray(ValueArray* array, Value value);
+void popValueArray(ValueArray* array);
 void freeValueArray(ValueArray* array);
 void printValue(Value value);
 

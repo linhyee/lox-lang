@@ -51,6 +51,8 @@ typedef enum {
   OP_CLASS,
   OP_INHERIT,
   OP_METHOD,
+  OP_IMPORT,
+  OP_IMPORT_DYNAMIC,
 } OpCode;
 
 typedef struct {

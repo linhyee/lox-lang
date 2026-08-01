@@ -32,7 +32,7 @@ int main(void) {
   printf("%s\n", user_data);
   printf("%s\n", (char*)&ch);
 
-  printf("%s\n", "国");
+  printf("%s\n", "閸?);
   return 0;
 }
 #endif

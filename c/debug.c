@@ -171,6 +171,10 @@ int disassembleInstruction(Chunk* chunk, int offset) {
     return simpleInstruction("OP_INHERIT", offset);
   case OP_METHOD:
     return constantInstruction("OP_METHOD", chunk, offset);
+  case OP_IMPORT:
+    return constantInstruction("OP_IMPORT", chunk, offset);
+  case OP_IMPORT_DYNAMIC:
+    return constantInstruction("OP_IMPORT_DYNAMIC", chunk, offset);
   default:
     printf("unknow opcode %d\n", instruction);
     return offset + 1;

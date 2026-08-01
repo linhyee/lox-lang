@@ -5,6 +5,12 @@
 #include "chunk.h"
 #include "table.h"
 #include "value.h"
+#include <time.h>
+
+typedef struct Obj Obj;
+typedef struct ObjString ObjString;
+typedef struct ObjModule ObjModule;
+typedef struct ObjClosure ObjClosure;
 
 #define OBJ_TYPE(value)        (AS_OBJ(value)->type)
 
@@ -17,6 +23,7 @@
 #define IS_STRING(value)       isObjType(value, OBJ_STRING)
 #define IS_LIST(value)         isObjType(value, OBJ_LIST)
 #define IS_MAP(value)          isObjType(value, OBJ_MAP)
+#define IS_MODULE(value)       isObjType(value, OBJ_MODULE)
 
 #define AS_BOUND_METHOD(value) ((ObjBoundMethod*)AS_OBJ(value))
 #define AS_CLASS(value)        ((ObjClass*)AS_OBJ(value))
@@ -28,6 +35,7 @@
 #define AS_CSTRING(value)      (((ObjString*)AS_OBJ(value))->chars)
 #define AS_LIST(value)         ((ObjList*)AS_OBJ(value))
 #define AS_MAP(value)          ((ObjMap*)AS_OBJ(value))
+#define AS_MODULE(value)       ((ObjModule*)AS_OBJ(value))
 
 typedef enum {
   OBJ_BOUND_METHOD,
@@ -39,6 +47,7 @@ typedef enum {
   OBJ_STRING,
   OBJ_LIST,
   OBJ_MAP,
+  OBJ_MODULE,
   OBJ_UPVALUE,
 } ObjType;
 
@@ -54,6 +63,7 @@ typedef struct {
   int upvalueCount; // 放在ObjFunction里面,因为要在runtime时用到
   Chunk chunk;
   ObjString* name;
+  struct ObjModule* module; // Backlink to module
 } ObjFunction;
 
 // 为了在native里面可以调用runtimeError, 所以设置一个外部errRet用来传送业务错误来终止native调用,
@@ -93,6 +103,23 @@ typedef struct {
   Table table;
 } ObjMap;
 
+typedef enum {
+  MODULE_LOADING,
+  MODULE_READY,
+  MODULE_EXECUTING,
+  MODULE_INITIALIZED,
+  MODULE_FAILED
+} ModuleState;
+
+struct ObjModule {
+  Obj obj;
+  ObjString* path;   // Canonical path
+  Table env;         // Module global environment
+  Table exports;     // Exported variable names (key only, value is NIL)
+  ObjClosure* closure;
+  ModuleState state;
+};
+
 typedef struct ObjUpvalue {
   Obj obj;
   Value* location;
@@ -101,12 +128,14 @@ typedef struct ObjUpvalue {
 } ObjUpvalue;
 
 
-typedef struct {
+struct ObjClosure {
   Obj obj;
   ObjFunction* function;
   ObjUpvalue** upvalues;
   int upvalueCount;
-} ObjClosure;
+  ObjModule* module;
+  Table* env;
+};
 
 typedef struct {
   Obj obj;
@@ -123,7 +152,6 @@ typedef struct {
 typedef struct {
   Obj obj;
   Value receiver;
-  //ObjClosure* method;
   Obj* method; //使用基类, 因为有methodNative
 } ObjBoundMethod;
 
@@ -132,6 +160,7 @@ ObjClass* newClass(ObjString* name);
 ObjClosure* newClosure(ObjFunction* function);
 ObjFunction* newFunction();
 ObjInstance* newInstance(ObjClass* klass);
+ObjModule* newModule(ObjString* name);
 ObjNative* newNative(NativeFn function, int arity);
 ObjString* takeString(char* chars, int length);
 ObjString* copyString(const char* chars, int length);

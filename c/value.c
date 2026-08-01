@@ -84,6 +84,12 @@ void printValue(Value value) {
 #endif
 }
 
+void popValueArray(ValueArray* array) {
+  if (array->count > 0) {
+    array->count--;
+  }
+}
+
 bool valuesEqual(Value a, Value b) {
 #ifdef NAN_BOXING
   if (IS_NUMBER(a) && IS_NUMBER(b)) {

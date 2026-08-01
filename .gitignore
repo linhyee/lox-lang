@@ -8,6 +8,8 @@ lox/*.exe
 lox/.idea
 lox/tool/*.exe
 .idea
+.vscode
+.agents
 
 # Test binary, built with `go test -c`
 *.test

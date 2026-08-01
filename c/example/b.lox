@@ -1,0 +1,6 @@
+fun loadA() {
+  import "a.lox";
+}
+
+export var b = 3;
+loadA();

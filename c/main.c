@@ -6,8 +6,12 @@
 #include "chunk.h"
 #include "debug.h"
 #include "vm.h"
+#include "compiler.h"
+#include "module.h"
 
 static void repl() {
+  setCompilerSource("./");
+  
   char line[1024];
   for (;;) {
     printf("> ");
@@ -17,7 +21,7 @@ static void repl() {
       break;
     }
 
-    interpret(line);
+    interpret(line, "repl");
   }
 }
 
@@ -50,9 +54,12 @@ static char* readFile(const char* path) {
   return buffer;
 }
 
-static void runFile(const char* path) {
+static int runFile(const char* path) {
+  setCompilerSource(path);
+  
   char* source = readFile(path);
-  InterpretResult result =interpret(source);
+
+  InterpretResult result = interpret(source, path);
   free(source);
 
   if (result == INTERPRET_COMPILE_ERROR) {
@@ -61,21 +68,33 @@ static void runFile(const char* path) {
   if (result == INTERPRET_RUNTIME_ERROR) {
     exit(70);
   }
+  return 0;
 }
 
 int main(int argc, const char *argv[]) {
   initVM();
+  initModuleLoader();
 
+  int exitCode = 0;
   if (argc == 1) {
     repl();
   } else if (argc == 2) {
-    runFile(argv[1]);
+    exitCode = runFile(argv[1]);
   } else {
     fprintf(stderr, "usage: clox [path]\n");
-    exit(64);
+    exitCode = 64;
   }
 
+  freeModuleLoader();
   freeVM();
-  return 0;
+
+#ifdef DEBUG_LEAK_CHECK
+  if (vm.bytesAllocated != 0) {
+    fprintf(stderr, "[leak-check] %zu bytes still allocated.\n", vm.bytesAllocated);
+    if (exitCode == 0) exitCode = 78;
+  }
+#endif
+
+  return exitCode;
 }
 
