@@ -1,27 +1,27 @@
 package lox
 
 type Expr interface {
-	accept(visitor VisitorExpr) interface{}
+	accept(visitor VisitorExpr) (interface{}, error)
 }
 
 type VisitorExpr interface {
-	visitAssignExpr(expr *Assign) interface{}
-	visitBinaryExpr(expr *Binary) interface{}
-	visitLambdaExpr(expr *Lambda) interface{}
-	visitCallExpr(expr *Call) interface{}
-	visitGetExpr(expr *Get) interface{}
-	visitIndexExpr(expr *Index) interface{}
-	visitArrayLiteralExpr(expr *ArrayLiteral) interface{}
-	visitGroupingExpr(expr *Grouping) interface{}
-	visitLiteralExpr(expr *Literal) interface{}
-	visitLogicalExpr(expr *Logical) interface{}
-	visitSetExpr(expr *Set) interface{}
-	visitSuperExpr(expr *Super) interface{}
-	visitThisExpr(expr *This) interface{}
-	visitArraySetExpr(expr *ArraySet) interface{}
-	visitUnaryExpr(expr *Unary) interface{}
-	visitTernaryExpr(expr *Ternary) interface{}
-	visitVariableExpr(expr *Variable) interface{}
+	visitAssignExpr(expr *Assign) (interface{}, error)
+	visitBinaryExpr(expr *Binary) (interface{}, error)
+	visitLambdaExpr(expr *Lambda) (interface{}, error)
+	visitCallExpr(expr *Call) (interface{}, error)
+	visitGetExpr(expr *Get) (interface{}, error)
+	visitIndexExpr(expr *Index) (interface{}, error)
+	visitArrayLiteralExpr(expr *ArrayLiteral) (interface{}, error)
+	visitGroupingExpr(expr *Grouping) (interface{}, error)
+	visitLiteralExpr(expr *Literal) (interface{}, error)
+	visitLogicalExpr(expr *Logical) (interface{}, error)
+	visitSetExpr(expr *Set) (interface{}, error)
+	visitSuperExpr(expr *Super) (interface{}, error)
+	visitThisExpr(expr *This) (interface{}, error)
+	visitArraySetExpr(expr *ArraySet) (interface{}, error)
+	visitUnaryExpr(expr *Unary) (interface{}, error)
+	visitTernaryExpr(expr *Ternary) (interface{}, error)
+	visitVariableExpr(expr *Variable) (interface{}, error)
 }
 
 func NewAssign(name *Token, value Expr) *Assign {
@@ -36,7 +36,7 @@ type Assign struct {
 	value Expr
 }
 
-func (this *Assign) accept(visitor VisitorExpr) interface{} {
+func (this *Assign) accept(visitor VisitorExpr) (interface{}, error) {
 	return visitor.visitAssignExpr(this)
 }
 
@@ -54,7 +54,7 @@ type Binary struct {
 	right Expr
 }
 
-func (this *Binary) accept(visitor VisitorExpr) interface{} {
+func (this *Binary) accept(visitor VisitorExpr) (interface{}, error) {
 	return visitor.visitBinaryExpr(this)
 }
 
@@ -70,7 +70,7 @@ type Lambda struct {
 	body []Stmt
 }
 
-func (this *Lambda) accept(visitor VisitorExpr) interface{} {
+func (this *Lambda) accept(visitor VisitorExpr) (interface{}, error) {
 	return visitor.visitLambdaExpr(this)
 }
 
@@ -88,7 +88,7 @@ type Call struct {
 	arguments []Expr
 }
 
-func (this *Call) accept(visitor VisitorExpr) interface{} {
+func (this *Call) accept(visitor VisitorExpr) (interface{}, error) {
 	return visitor.visitCallExpr(this)
 }
 
@@ -104,7 +104,7 @@ type Get struct {
 	name *Token
 }
 
-func (this *Get) accept(visitor VisitorExpr) interface{} {
+func (this *Get) accept(visitor VisitorExpr) (interface{}, error) {
 	return visitor.visitGetExpr(this)
 }
 
@@ -122,7 +122,7 @@ type Index struct {
 	index Expr
 }
 
-func (this *Index) accept(visitor VisitorExpr) interface{} {
+func (this *Index) accept(visitor VisitorExpr) (interface{}, error) {
 	return visitor.visitIndexExpr(this)
 }
 
@@ -138,7 +138,7 @@ type ArrayLiteral struct {
 	items []Expr
 }
 
-func (this *ArrayLiteral) accept(visitor VisitorExpr) interface{} {
+func (this *ArrayLiteral) accept(visitor VisitorExpr) (interface{}, error) {
 	return visitor.visitArrayLiteralExpr(this)
 }
 
@@ -152,7 +152,7 @@ type Grouping struct {
 	expression Expr
 }
 
-func (this *Grouping) accept(visitor VisitorExpr) interface{} {
+func (this *Grouping) accept(visitor VisitorExpr) (interface{}, error) {
 	return visitor.visitGroupingExpr(this)
 }
 
@@ -166,7 +166,7 @@ type Literal struct {
 	value interface{}
 }
 
-func (this *Literal) accept(visitor VisitorExpr) interface{} {
+func (this *Literal) accept(visitor VisitorExpr) (interface{}, error) {
 	return visitor.visitLiteralExpr(this)
 }
 
@@ -184,7 +184,7 @@ type Logical struct {
 	right Expr
 }
 
-func (this *Logical) accept(visitor VisitorExpr) interface{} {
+func (this *Logical) accept(visitor VisitorExpr) (interface{}, error) {
 	return visitor.visitLogicalExpr(this)
 }
 
@@ -202,7 +202,7 @@ type Set struct {
 	value Expr
 }
 
-func (this *Set) accept(visitor VisitorExpr) interface{} {
+func (this *Set) accept(visitor VisitorExpr) (interface{}, error) {
 	return visitor.visitSetExpr(this)
 }
 
@@ -218,7 +218,7 @@ type Super struct {
 	method *Token
 }
 
-func (this *Super) accept(visitor VisitorExpr) interface{} {
+func (this *Super) accept(visitor VisitorExpr) (interface{}, error) {
 	return visitor.visitSuperExpr(this)
 }
 
@@ -232,7 +232,7 @@ type This struct {
 	keyword *Token
 }
 
-func (this *This) accept(visitor VisitorExpr) interface{} {
+func (this *This) accept(visitor VisitorExpr) (interface{}, error) {
 	return visitor.visitThisExpr(this)
 }
 
@@ -252,7 +252,7 @@ type ArraySet struct {
 	value Expr
 }
 
-func (this *ArraySet) accept(visitor VisitorExpr) interface{} {
+func (this *ArraySet) accept(visitor VisitorExpr) (interface{}, error) {
 	return visitor.visitArraySetExpr(this)
 }
 
@@ -270,7 +270,7 @@ type Unary struct {
 	postfix bool
 }
 
-func (this *Unary) accept(visitor VisitorExpr) interface{} {
+func (this *Unary) accept(visitor VisitorExpr) (interface{}, error) {
 	return visitor.visitUnaryExpr(this)
 }
 
@@ -288,7 +288,7 @@ type Ternary struct {
 	elseBranch Expr
 }
 
-func (this *Ternary) accept(visitor VisitorExpr) interface{} {
+func (this *Ternary) accept(visitor VisitorExpr) (interface{}, error) {
 	return visitor.visitTernaryExpr(this)
 }
 
@@ -302,7 +302,6 @@ type Variable struct {
 	name *Token
 }
 
-func (this *Variable) accept(visitor VisitorExpr) interface{} {
+func (this *Variable) accept(visitor VisitorExpr) (interface{}, error) {
 	return visitor.visitVariableExpr(this)
 }
-

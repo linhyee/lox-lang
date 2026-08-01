@@ -1,0 +1,65 @@
+print "=== Test while with continue ===";
+var i = 0;
+while (i < 5) {
+  i++;
+  if (i == 3) {
+    continue;
+  }
+  print i;
+}
+
+print "=== Test while with break ===";
+var j = 0;
+while (true) {
+  j++;
+  if (j > 5) {
+    break;
+  }
+  print j;
+}
+
+print "=== Test nested loops: inner break, outer continue ===";
+var outer = 0;
+while (outer < 3) {
+  outer++;
+  print "outer " + string(outer);
+  var inner = 0;
+  while (inner < 10) {
+    inner++;
+    if (inner == 3) {
+      break;
+    }
+    print "  inner " + string(inner);
+  }
+  if (outer == 2) {
+    continue;
+  }
+  print "  after inner (outer=" + string(outer) + ")";
+}
+
+print "=== Test function return inside loop ===";
+fun countUntil(max, stopAt) {
+  var n = 0;
+  while (n < max) {
+    n++;
+    if (n == stopAt) {
+      return "stopped at " + string(n);
+    }
+  }
+  return "completed";
+}
+print countUntil(10, 4);
+print countUntil(10, 100);
+
+print "=== Test for loop with break/continue ===";
+for (var k = 0; k < 10; k++) {
+  if (k == 2) {
+    continue;
+  }
+  if (k == 7) {
+    break;
+  }
+  print k;
+}
+
+print "=== All tests passed! ===";

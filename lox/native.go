@@ -24,8 +24,8 @@ func (this *Clock) Arity() int {
 	return 0
 }
 
-func (this *Clock) Call(interpreter *Interpreter, arguments []interface{}) interface{} {
-	return time.Now().UnixNano()
+func (this *Clock) Call(interpreter *Interpreter, arguments []interface{}) (interface{}, error) {
+	return float64(time.Now().UnixNano()), nil
 }
 
 func (this Clock) String() string {
@@ -43,15 +43,15 @@ func (this *Len) Arity() int {
 	return 1
 }
 
-func (this *Len) Call(interpreter *Interpreter, arguments []interface{}) interface{} {
+func (this *Len) Call(interpreter *Interpreter, arguments []interface{}) (interface{}, error) {
 	arg := arguments[0]
 	switch v := arg.(type) {
 	case string:
-		return float64(utf8.RuneCountInString(v))
+		return float64(utf8.RuneCountInString(v)), nil
 	case LoxIterator:
-		return float64(v.Len())
+		return float64(v.Len()), nil
 	}
-	return float64(1)
+	return float64(1), nil
 }
 
 func (this Len) String() string {
@@ -69,13 +69,13 @@ func (this *String) Arity() int {
 	return 1
 }
 
-func (this *String) Call(interpreter *Interpreter, arguments []interface{}) interface{} {
+func (this *String) Call(interpreter *Interpreter, arguments []interface{}) (interface{}, error) {
 	arg := arguments[0]
 	switch v := arg.(type) {
 	case string:
-		return v
+		return v, nil
 	default:
-		return fmt.Sprintf("%v", arg)
+		return fmt.Sprintf("%v", arg), nil
 	}
 }
 

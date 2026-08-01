@@ -1,21 +1,21 @@
 package lox
 
 type Stmt interface {
-	accept(visitor VisitorStmt) interface{}
+	accept(visitor VisitorStmt) (interface{}, error)
 }
 
 type VisitorStmt interface {
-	visitBlockStmt(stmt *Block) interface{}
-	visitClassStmt(stmt *Class) interface{}
-	visitExpressionStmt(stmt *Expression) interface{}
-	visitFunctionStmt(stmt *Function) interface{}
-	visitIfStmt(stmt *If) interface{}
-	visitPrintStmt(stmt *Print) interface{}
-	visitReturnStmt(stmt *Return) interface{}
-	visitVarStmt(stmt *Var) interface{}
-	visitWhileStmt(stmt *While) interface{}
-	visitBreakStmt(stmt *Break) interface{}
-	visitContinueStmt(stmt *Continue) interface{}
+	visitBlockStmt(stmt *Block) (interface{}, error)
+	visitClassStmt(stmt *Class) (interface{}, error)
+	visitExpressionStmt(stmt *Expression) (interface{}, error)
+	visitFunctionStmt(stmt *Function) (interface{}, error)
+	visitIfStmt(stmt *If) (interface{}, error)
+	visitPrintStmt(stmt *Print) (interface{}, error)
+	visitReturnStmt(stmt *Return) (interface{}, error)
+	visitVarStmt(stmt *Var) (interface{}, error)
+	visitWhileStmt(stmt *While) (interface{}, error)
+	visitBreakStmt(stmt *Break) (interface{}, error)
+	visitContinueStmt(stmt *Continue) (interface{}, error)
 }
 
 func NewBlock(statements []Stmt) *Block {
@@ -28,7 +28,7 @@ type Block struct {
 	statements []Stmt
 }
 
-func (this *Block) accept(visitor VisitorStmt) interface{} {
+func (this *Block) accept(visitor VisitorStmt) (interface{}, error) {
 	return visitor.visitBlockStmt(this)
 }
 
@@ -46,7 +46,7 @@ type Class struct {
 	methods []*Function
 }
 
-func (this *Class) accept(visitor VisitorStmt) interface{} {
+func (this *Class) accept(visitor VisitorStmt) (interface{}, error) {
 	return visitor.visitClassStmt(this)
 }
 
@@ -60,7 +60,7 @@ type Expression struct {
 	expression Expr
 }
 
-func (this *Expression) accept(visitor VisitorStmt) interface{} {
+func (this *Expression) accept(visitor VisitorStmt) (interface{}, error) {
 	return visitor.visitExpressionStmt(this)
 }
 
@@ -78,7 +78,7 @@ type Function struct {
 	body []Stmt
 }
 
-func (this *Function) accept(visitor VisitorStmt) interface{} {
+func (this *Function) accept(visitor VisitorStmt) (interface{}, error) {
 	return visitor.visitFunctionStmt(this)
 }
 
@@ -96,7 +96,7 @@ type If struct {
 	elseBranch Stmt
 }
 
-func (this *If) accept(visitor VisitorStmt) interface{} {
+func (this *If) accept(visitor VisitorStmt) (interface{}, error) {
 	return visitor.visitIfStmt(this)
 }
 
@@ -110,7 +110,7 @@ type Print struct {
 	expression Expr
 }
 
-func (this *Print) accept(visitor VisitorStmt) interface{} {
+func (this *Print) accept(visitor VisitorStmt) (interface{}, error) {
 	return visitor.visitPrintStmt(this)
 }
 
@@ -126,7 +126,7 @@ type Return struct {
 	value Expr
 }
 
-func (this *Return) accept(visitor VisitorStmt) interface{} {
+func (this *Return) accept(visitor VisitorStmt) (interface{}, error) {
 	return visitor.visitReturnStmt(this)
 }
 
@@ -142,7 +142,7 @@ type Var struct {
 	initializer Expr
 }
 
-func (this *Var) accept(visitor VisitorStmt) interface{} {
+func (this *Var) accept(visitor VisitorStmt) (interface{}, error) {
 	return visitor.visitVarStmt(this)
 }
 
@@ -158,7 +158,7 @@ type While struct {
 	body Stmt
 }
 
-func (this *While) accept(visitor VisitorStmt) interface{} {
+func (this *While) accept(visitor VisitorStmt) (interface{}, error) {
 	return visitor.visitWhileStmt(this)
 }
 
@@ -171,7 +171,7 @@ type Break struct {
 	
 }
 
-func (this *Break) accept(visitor VisitorStmt) interface{} {
+func (this *Break) accept(visitor VisitorStmt) (interface{}, error) {
 	return visitor.visitBreakStmt(this)
 }
 
@@ -184,7 +184,6 @@ type Continue struct {
 	
 }
 
-func (this *Continue) accept(visitor VisitorStmt) interface{} {
+func (this *Continue) accept(visitor VisitorStmt) (interface{}, error) {
 	return visitor.visitContinueStmt(this)
 }
-

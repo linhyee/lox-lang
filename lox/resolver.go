@@ -31,11 +31,11 @@ type Resolver struct {
 	currentClass    ClassType
 }
 
-func (this *Resolver) visitBlockStmt(stmt *Block) interface{} {
+func (this *Resolver) visitBlockStmt(stmt *Block) (interface{}, error) {
 	this.beginScope()
 	this.resolve(stmt.statements)
 	this.endScope()
-	return nil
+	return nil, nil
 }
 
 func (this *Resolver) resolve(statements []Stmt) {
@@ -60,13 +60,13 @@ func (this *Resolver) endScope() {
 	_, _ = this.scopes.Pop()
 }
 
-func (this *Resolver) visitVarStmt(stmt *Var) interface{} {
+func (this *Resolver) visitVarStmt(stmt *Var) (interface{}, error) {
 	this.declare(stmt.name)
 	if stmt.initializer != nil {
 		this.resolveExpr(stmt.initializer)
 	}
 	this.define(stmt.name)
-	return nil
+	return nil, nil
 }
 
 func (this *Resolver) declare(name *Token) {
@@ -88,14 +88,14 @@ func (this *Resolver) define(name *Token) {
 	scope[name.Lexeme] = true
 }
 
-func (this *Resolver) visitVariableExpr(expr *Variable) interface{} {
+func (this *Resolver) visitVariableExpr(expr *Variable) (interface{}, error) {
 	if !this.scopes.IsEmpty() {
 		if value, ok := this.scopes.Top().(map[string]bool)[expr.name.Lexeme]; ok && value == false {
 			errorToken(expr.name, "can't read local variable in its own initializer.")
 		}
 	}
 	this.resolveLocal(expr, expr.name)
-	return nil
+	return nil, nil
 }
 
 func (this *Resolver) resolveLocal(expr Expr, name *Token) {
@@ -109,13 +109,13 @@ func (this *Resolver) resolveLocal(expr Expr, name *Token) {
 	}
 }
 
-func (this *Resolver) visitAssignExpr(expr *Assign) interface{} {
+func (this *Resolver) visitAssignExpr(expr *Assign) (interface{}, error) {
 	this.resolveExpr(expr.value)
 	this.resolveLocal(expr, expr.name)
-	return nil
+	return nil, nil
 }
 
-func (this *Resolver) visitClassStmt(stmt *Class) interface{} {
+func (this *Resolver) visitClassStmt(stmt *Class) (interface{}, error) {
 	enclosingClass := this.currentClass
 	this.currentClass = CT_CLASS
 
@@ -149,14 +149,14 @@ func (this *Resolver) visitClassStmt(stmt *Class) interface{} {
 		this.endScope()
 	}
 	this.currentClass = enclosingClass
-	return nil
+	return nil, nil
 }
 
-func (this *Resolver) visitFunctionStmt(stmt *Function) interface{} {
+func (this *Resolver) visitFunctionStmt(stmt *Function) (interface{}, error) {
 	this.declare(stmt.name)
 	this.define(stmt.name)
 	this.resolveFunction(stmt, FT_FUNCTION)
-	return nil
+	return nil, nil
 }
 
 func (this *Resolver) resolveFunction(function *Function, ft FunctionType) {
@@ -184,26 +184,26 @@ func (this *Resolver) function(params []*Token, body []Stmt, ft FunctionType) {
 	this.currentFunction = enclosingFunction
 }
 
-func (this *Resolver) visitExpressionStmt(stmt *Expression) interface{} {
+func (this *Resolver) visitExpressionStmt(stmt *Expression) (interface{}, error) {
 	this.resolveExpr(stmt.expression)
-	return nil
+	return nil, nil
 }
 
-func (this *Resolver) visitIfStmt(stmt *If) interface{} {
+func (this *Resolver) visitIfStmt(stmt *If) (interface{}, error) {
 	this.resolveExpr(stmt.condition)
 	this.resolveStmt(stmt.thenBranch)
 	if stmt.elseBranch != nil {
 		this.resolveStmt(stmt.elseBranch)
 	}
-	return nil
+	return nil, nil
 }
 
-func (this *Resolver) visitPrintStmt(stmt *Print) interface{} {
+func (this *Resolver) visitPrintStmt(stmt *Print) (interface{}, error) {
 	this.resolveExpr(stmt.expression)
-	return nil
+	return nil, nil
 }
 
-func (this *Resolver) visitReturnStmt(stmt *Return) interface{} {
+func (this *Resolver) visitReturnStmt(stmt *Return) (interface{}, error) {
 	if this.currentFunction == FT_NONE {
 		errorToken(stmt.keyword, "can't return from top-level code.")
 	}
@@ -213,117 +213,117 @@ func (this *Resolver) visitReturnStmt(stmt *Return) interface{} {
 		}
 		this.resolveExpr(stmt.value)
 	}
-	return nil
+	return nil, nil
 }
 
-func (this *Resolver) visitWhileStmt(stmt *While) interface{} {
+func (this *Resolver) visitWhileStmt(stmt *While) (interface{}, error) {
 	this.resolveExpr(stmt.condition)
 	this.resolveStmt(stmt.body)
-	return nil
+	return nil, nil
 }
 
-func (this *Resolver) visitBreakStmt(stmt *Break) interface{} {
-	return nil
+func (this *Resolver) visitBreakStmt(stmt *Break) (interface{}, error) {
+	return nil, nil
 }
 
-func (this *Resolver) visitContinueStmt(stmt *Continue) interface{} {
-	return nil
+func (this *Resolver) visitContinueStmt(stmt *Continue) (interface{}, error) {
+	return nil, nil
 }
 
-func (this *Resolver) visitBinaryExpr(expr *Binary) interface{} {
+func (this *Resolver) visitBinaryExpr(expr *Binary) (interface{}, error) {
 	this.resolveExpr(expr.left)
 	this.resolveExpr(expr.right)
-	return nil
+	return nil, nil
 }
 
-func (this *Resolver) visitCallExpr(expr *Call) interface{} {
+func (this *Resolver) visitCallExpr(expr *Call) (interface{}, error) {
 	this.resolveExpr(expr.callee)
 	for _, argument := range expr.arguments {
 		this.resolveExpr(argument)
 	}
-	return nil
+	return nil, nil
 }
 
-func (this *Resolver) visitGroupingExpr(expr *Grouping) interface{} {
+func (this *Resolver) visitGroupingExpr(expr *Grouping) (interface{}, error) {
 	this.resolveExpr(expr.expression)
-	return nil
+	return nil, nil
 }
 
-func (this *Resolver) visitLiteralExpr(expr *Literal) interface{} {
-	return nil
+func (this *Resolver) visitLiteralExpr(expr *Literal) (interface{}, error) {
+	return nil, nil
 }
 
-func (this *Resolver) visitLogicalExpr(expr *Logical) interface{} {
+func (this *Resolver) visitLogicalExpr(expr *Logical) (interface{}, error) {
 	this.resolveExpr(expr.left)
 	this.resolveExpr(expr.right)
-	return nil
+	return nil, nil
 }
 
-func (this *Resolver) visitSetExpr(expr *Set) interface{} {
+func (this *Resolver) visitSetExpr(expr *Set) (interface{}, error) {
 	this.resolveExpr(expr.value)
 	this.resolveExpr(expr.object)
-	return nil
+	return nil, nil
 }
 
-func (this *Resolver) visitSuperExpr(expr *Super) interface{} {
+func (this *Resolver) visitSuperExpr(expr *Super) (interface{}, error) {
 	if this.currentClass == CT_NONE {
 		errorToken(expr.keyword, "can't use 'super' outside of a class.")
 	} else if this.currentClass != CT_SUBCLASS {
 		errorToken(expr.keyword, "can't use 'super' in a class with no superclass.")
 	}
 	this.resolveLocal(expr, expr.keyword)
-	return nil
+	return nil, nil
 }
 
-func (this *Resolver) visitThisExpr(expr *This) interface{} {
+func (this *Resolver) visitThisExpr(expr *This) (interface{}, error) {
 	if this.currentClass == CT_NONE {
 		errorToken(expr.keyword, "can't use 'this' outside of a class.")
-		return nil
+		return nil, nil
 	}
 	this.resolveLocal(expr, expr.keyword)
-	return nil
+	return nil, nil
 }
 
-func (this *Resolver) visitGetExpr(expr *Get) interface{} {
+func (this *Resolver) visitGetExpr(expr *Get) (interface{}, error) {
 	this.resolveExpr(expr.object)
-	return nil
+	return nil, nil
 }
 
-func (this *Resolver) visitUnaryExpr(expr *Unary) interface{} {
+func (this *Resolver) visitUnaryExpr(expr *Unary) (interface{}, error) {
 	this.resolveExpr(expr.right)
-	return nil
+	return nil, nil
 }
 
-func (this *Resolver) visitTernaryExpr(expr *Ternary) interface{} {
+func (this *Resolver) visitTernaryExpr(expr *Ternary) (interface{}, error) {
 	this.resolveExpr(expr.expr)
 	this.resolveExpr(expr.thenBranch)
 	this.resolveExpr(expr.elseBranch)
-	return nil
+	return nil, nil
 }
 
-func (this *Resolver) visitLambdaExpr(expr *Lambda) interface{} {
+func (this *Resolver) visitLambdaExpr(expr *Lambda) (interface{}, error) {
 	this.resolveLambda(expr, FT_FUNCTION)
-	return nil
+	return nil, nil
 }
 
-func (this *Resolver) visitIndexExpr(expr *Index) interface{} {
+func (this *Resolver) visitIndexExpr(expr *Index) (interface{}, error) {
 	this.resolveExpr(expr.left)
 	this.resolveExpr(expr.index)
-	return nil
+	return nil, nil
 }
 
-func (this *Resolver) visitArraySetExpr(expr *ArraySet) interface{} {
+func (this *Resolver) visitArraySetExpr(expr *ArraySet) (interface{}, error) {
 	this.resolveExpr(expr.left)
 	if expr.index != nil {
 		this.resolveExpr(expr.index)
 	}
 	this.resolveExpr(expr.value)
-	return nil
+	return nil, nil
 }
 
-func (this *Resolver) visitArrayLiteralExpr(expr *ArrayLiteral) interface{} {
+func (this *Resolver) visitArrayLiteralExpr(expr *ArrayLiteral) (interface{}, error) {
 	for _, expr := range expr.items {
 		this.resolveExpr(expr)
 	}
-	return nil
+	return nil, nil
 }

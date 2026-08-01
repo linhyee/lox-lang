@@ -20,12 +20,15 @@ func (this *LoxClass) findMethod(name string) LoxCallable {
 	return nil
 }
 
-func (this *LoxClass) Call(interpreter *Interpreter, arguments []interface{}) interface{} {
+func (this *LoxClass) Call(interpreter *Interpreter, arguments []interface{}) (interface{}, error) {
 	instance := NewLoxInstance(this)
 	if initializer := this.findMethod("init"); initializer != nil {
-		initializer.(*LoxFunction).Bind(instance).Call(interpreter, arguments)
+		_, err := initializer.(*LoxFunction).Bind(instance).Call(interpreter, arguments)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return instance
+	return instance, nil
 }
 
 func (this *LoxClass) Arity() int {

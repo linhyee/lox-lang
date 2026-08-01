@@ -14,7 +14,7 @@ func NewLoxLambda(lambda *Lambda, closure *Environment, isInitializer bool) LoxC
 
 type LoxFunction struct {
 	declaration   *Function
-	closure       *Environment //闭包环境
+	closure       *Environment
 	isInitializer bool
 }
 
@@ -28,28 +28,26 @@ func (this *LoxFunction) Arity() int {
 	return len(this.declaration.params)
 }
 
-func (this *LoxFunction) Call(interpreter *Interpreter, arguments []interface{}) (value interface{}) {
-	env := NewEnvironment(this.closure) //parent 指向创造函数的环境
+func (this *LoxFunction) Call(interpreter *Interpreter, arguments []interface{}) (interface{}, error) {
+	env := NewEnvironment(this.closure)
 	for i := 0; i < len(this.declaration.params); i++ {
 		env.Define(this.declaration.params[i].Lexeme, arguments[i])
 	}
-	defer func(this *LoxFunction) {
-		if r := recover(); r != nil {
-			if v, ok := r.(*returnExp); ok && v != nil {
-				value = v.value
-				if this.isInitializer {
-					value = this.closure.GetAt(0, "this")
-				}
-			} else {
-				panic(r) //往上传播恐慌
+	err := interpreter.executeBlock(this.declaration.body, env)
+	if err != nil {
+		if cf, ok := IsControlFlow(err); ok && cf.IsReturn() {
+			value := cf.Value()
+			if this.isInitializer {
+				return this.closure.GetAt(0, "this"), nil
 			}
+			return value, nil
 		}
-		if this.isInitializer {
-			value = this.closure.GetAt(0, "this")
-		}
-	}(this)
-	interpreter.executeBlock(this.declaration.body, env)
-	return
+		return nil, err
+	}
+	if this.isInitializer {
+		return this.closure.GetAt(0, "this"), nil
+	}
+	return nil, nil
 }
 
 func (this LoxFunction) String() string {
