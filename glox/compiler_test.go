@@ -148,6 +148,7 @@ for (var j = 0; j < 2; j = j + 1) print j;
 		OpEqual, OpGreater, OpLess, OpAdd, OpSubtract, OpMultiply, OpDivide, OpNot, OpNegate,
 		OpPrint, OpJump, OpJumpIfFalse, OpLoop, OpCall, OpInvoke, OpSuperInvoke, OpClosure,
 		OpCloseUpvalue, OpReturn, OpClass, OpInherit, OpMethod,
+		OpPopResult,
 	}
 	for _, op := range want {
 		if got[op] == 0 {

@@ -111,7 +111,9 @@ func (this *Interpreter) visitClassStmt(stmt *Class) (interface{}, error) {
 		this.environment = this.environment.enclosing
 	}
 
-	this.environment.Assign(stmt.name, class)
+	if err := this.environment.Assign(stmt.name, class); err != nil {
+		return nil, err
+	}
 	return nil, nil
 }
 
@@ -196,7 +198,9 @@ func (this *Interpreter) visitUnaryExpr(expr *Unary) (interface{}, error) {
 		}
 
 		value := right.(float64)
-		this.environment.Assign(expr.right.(*Variable).name, value+1)
+		if err := this.environment.Assign(expr.right.(*Variable).name, value+1); err != nil {
+			return nil, err
+		}
 		return IfFloat(expr.postfix, value, value+1), nil
 	case MINUS_MINUS:
 		if err := this.checkVariable(expr.operator, expr.right, "operand of a decrement operator must be a variable."); err != nil {
@@ -207,7 +211,9 @@ func (this *Interpreter) visitUnaryExpr(expr *Unary) (interface{}, error) {
 		}
 
 		value := right.(float64)
-		this.environment.Assign(expr.right.(*Variable).name, value-1)
+		if err := this.environment.Assign(expr.right.(*Variable).name, value-1); err != nil {
+			return nil, err
+		}
 		return IfFloat(expr.postfix, value, value-1), nil
 	}
 	return nil, nil
@@ -222,7 +228,7 @@ func (this *Interpreter) lookUpVariable(name *Token, expr Expr) (interface{}, er
 	if ok {
 		return this.environment.GetAt(distance, name.Lexeme), nil
 	} else {
-		return globals.Get(name), nil
+		return globals.Get(name)
 	}
 }
 
@@ -487,7 +493,9 @@ func (this *Interpreter) visitAssignExpr(expr *Assign) (interface{}, error) {
 	if ok {
 		this.environment.AssignAt(distance, expr.name, value)
 	} else {
-		globals.Assign(expr.name, value)
+		if err := globals.Assign(expr.name, value); err != nil {
+			return nil, err
+		}
 	}
 	return value, nil
 }
@@ -556,12 +564,36 @@ func (this *Interpreter) checkNumberOperand(operator *Token, operand interface{}
 }
 
 func (this *Interpreter) checkNumberOperands(operator *Token, left, right interface{}) error {
-	_, ok1 := left.(float64)
-	_, ok2 := right.(float64)
-	if ok1 && ok2 {
+	if this.isNumber(left) && this.isNumber(right) {
 		return nil
 	}
 	return NewRuntimeError(operator, "operands must be numbers.")
+}
+
+func (this *Interpreter) isNumber(val interface{}) bool {
+	switch val.(type) {
+	case float64, int64, int, int32, int8:
+		return true
+	}
+	return false
+}
+
+// isString
+func (this *Interpreter) isString(val interface{}) bool {
+	_, ok := val.(string)
+	return ok
+}
+
+// toFloat64
+func (this *Interpreter) toFloat64(val interface{}) float64 {
+	switch v := val.(type) {
+	case float64:
+		return v
+	case int64:
+		return float64(v)
+	default:
+		return 0
+	}
 }
 
 func (this *Interpreter) checkVariable(operator *Token, right interface{}, message string) error {

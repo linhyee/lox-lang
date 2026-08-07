@@ -37,7 +37,20 @@ type Scanner struct {
 
 // NewScanner return an pointer that points to scanner object
 func NewScanner(source string) *Scanner {
-	return &Scanner{source: strings.NewReader(source), line: 1}
+	return &Scanner{source: strings.NewReader(source), line: 1, tokens: make([]*Token, 0, 100)}
+}
+
+func (this *Scanner) String() string {
+	var sb strings.Builder
+
+	fmt.Fprintf(&sb, "%-15s\t%-20s\t%-20v\n", "Type", "Lexeme", "Literal")
+	for _, t := range this.tokens {
+		fmt.Fprintf(&sb, "%-15s\t", tokenNames[t.Type])
+		fmt.Fprintf(&sb, "%-20s\t", t.Lexeme)
+		fmt.Fprintf(&sb, "%-20v", t.Literal)
+		sb.WriteString("\n")
+	}
+	return sb.String()
 }
 
 // ScanTokens adding tokens until it runs out of characters
@@ -150,12 +163,13 @@ func (this *Scanner) match(expected rune) bool {
 	if this.isAtEnd() {
 		return false
 	}
-	b := make([]byte, 1)
-	_, _ = this.source.ReadAt(b, int64(this.current))
-	if rune(b[0]) != expected {
+	// 先用 peek 查看，避免消耗
+	ch := this.peek()
+	if ch != expected {
 		return false
 	}
-	this.current++
+	// 确认匹配，消耗掉这个 rune
+	this.advance()
 	return true
 }
 
@@ -163,52 +177,87 @@ func (this *Scanner) peek() rune {
 	if this.isAtEnd() {
 		return '\x00'
 	}
-	b := make([]byte, 1)
-	_, _ = this.source.ReadAt(b, int64(this.current))
-	return rune(b[0])
+	// 保存当前位置
+	pos, _ := this.source.Seek(0, 1)
+	ch, _, _ := this.source.ReadRune()
+	// 恢复位置
+	this.source.Seek(pos, 0)
+	return ch
 }
 
 func (this *Scanner) peekNext() rune {
 	if int64(this.current)+1 >= this.source.Size() {
 		return '\x00'
 	}
-	b := make([]byte, 1)
-	_, _ = this.source.ReadAt(b, int64(this.current))
-	return rune(b[0])
+	// 保存当前位置
+	pos, _ := this.source.Seek(0, 1)
+	// 先读取当前 rune，再读取下一个
+	_, size, _ := this.source.ReadRune()
+	if int64(this.current+size) >= this.source.Size() {
+		this.source.Seek(pos, 0)
+		return 0
+	}
+	nextCh, _, _ := this.source.ReadRune()
+	// 恢复位置
+	this.source.Seek(pos, 0)
+	return nextCh
 }
 
 func (this *Scanner) strings() {
-	for this.peek() != '"' && !this.isAtEnd() {
+	var sb strings.Builder
+
+	for !this.isAtEnd() {
 		ch := this.peek()
+
+		if ch == '"' {
+			this.advance()
+			this.addTokenWithLiteral(STRING, sb.String())
+			return
+		}
+
 		if ch == '\n' {
 			this.line++
 		}
-		//处理转义字符
+
+		// 处理转义字符
 		if ch == '\\' {
-			ch2 := this.peekNext()
-			//TODO
-			if ch2 == '"' {
-			} else if ch2 == '\\' {
-			} else if ch2 == 'b' {
-			} else if ch2 == 'r' {
-			} else if ch2 == 'n' {
-			} else if ch2 == 't' {
+			this.advance()
+			if this.isAtEnd() {
+				errorLine(this.line, "unterminated string escape")
+				return
 			}
+
+			esc := this.advance()
+			switch esc {
+			case '"':
+				sb.WriteRune('"')
+			case '\\':
+				sb.WriteRune('\\')
+			case 'b':
+				sb.WriteRune('\b')
+			case 'f':
+				sb.WriteRune('\f')
+			case 'n':
+				sb.WriteRune('\n')
+			case 'r':
+				sb.WriteRune('\r')
+			case 't':
+				sb.WriteRune('\t')
+			case 'v':
+				sb.WriteRune('\v')
+			default:
+				// 未知转义，保留原字符
+				sb.WriteRune(esc)
+			}
+			continue
 		}
 
+		// 普通字符
 		this.advance()
+		sb.WriteRune(ch)
 	}
-	if this.isAtEnd() {
-		errorLine(this.line, "unterminated string.")
-		return
-	}
-	// The closing ".
-	this.advance()
 
-	// Trim the surrounding quotes.
-	value := make([]byte, this.current-1-this.start-1)
-	_, _ = this.source.ReadAt(value, int64(this.start)+1)
-	this.addTokenWithLiteral(STRING, string(value))
+	errorLine(this.line, "unterminated string")
 }
 
 func (this *Scanner) isDigit(c rune) bool {
@@ -221,7 +270,9 @@ func (this *Scanner) number() {
 	}
 
 	// look for a fractional part
+	isF := false
 	if this.peek() == '.' && this.isDigit(this.peekNext()) {
+		isF = true
 		// consume the "."
 		this.advance()
 
@@ -230,11 +281,32 @@ func (this *Scanner) number() {
 		}
 	}
 
+	if this.peek() == 'e' || this.peek() == 'E' {
+		isF = true
+		this.advance()
+		if this.peek() == '+' || this.peek() == '-' {
+			this.advance()
+		}
+		if !this.isDigit(this.peek()) {
+			errorLine(this.line, "invalid number format")
+			return
+		}
+		for this.isDigit(this.peek()) {
+			this.advance()
+		}
+	}
+
 	b := make([]byte, this.current-this.start)
 	_, _ = this.source.ReadAt(b, int64(this.start))
 
-	value, _ := strconv.ParseFloat(string(b), 0)
-	this.addTokenWithLiteral(NUMBER, value)
+	isF = true
+	if isF {
+		value, _ := strconv.ParseFloat(string(b), 0)
+		this.addTokenWithLiteral(NUMBER, value)
+	} else {
+		value, _ := strconv.ParseInt(string(b), 10, 64)
+		this.addTokenWithLiteral(NUMBER, value)
+	}
 }
 
 func (this *Scanner) isAlpha(c rune) bool {

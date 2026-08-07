@@ -82,7 +82,7 @@ func TestVMDisassembleAndTraceIntegration(t *testing.T) {
 		"== script ==",
 		"OP_DEFINE_GLOBAL",
 		"OP_PRINT",
-		"[ <fn script> ]",
+		"[ <script> ]",
 		"OP_CONSTANT",
 	} {
 		if !strings.Contains(got, want) {

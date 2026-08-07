@@ -148,7 +148,7 @@ func (p *Parser) namedVariable(name Token, canAssign bool) {
 		}
 		p.emitBytes(byte(getOp), arg)
 		p.emitOp(OpDup)
-		p.emitConstant(float64(1))
+		p.emitConstant(int64(1))
 		if operator == TokenPlusPlus {
 			p.emitOp(OpAdd)
 		} else {

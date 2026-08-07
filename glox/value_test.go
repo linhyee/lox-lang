@@ -6,7 +6,7 @@ import (
 )
 
 func TestValueTruthinessEqualityAndStringify(t *testing.T) {
-	if !IsFalsey(nil) || !IsFalsey(false) || IsFalsey(true) || IsFalsey(float64(0)) || IsFalsey("") {
+	if !IsFalsey(nil) || !IsFalsey(false) || IsFalsey(true) || IsFalsey(int64(0)) || IsFalsey(float64(0)) || IsFalsey("") {
 		t.Fatal("falsey semantics mismatch")
 	}
 
@@ -18,6 +18,10 @@ func TestValueTruthinessEqualityAndStringify(t *testing.T) {
 		{nil, false, false},
 		{true, true, true},
 		{true, false, false},
+		{int64(1), int64(1), true},
+		{int64(1), int64(2), false},
+		{int64(1), float64(1), true},
+		{float64(1), int64(1), true},
 		{float64(1), float64(1), true},
 		{float64(1), float64(2), false},
 		{"x", "x", true},
@@ -29,20 +33,21 @@ func TestValueTruthinessEqualityAndStringify(t *testing.T) {
 		}
 	}
 
-	list := &List{Items: []Value{float64(1), "x", nil, true}}
+	list := &List{Items: []Value{int64(1), "x", nil, true}}
 	m := NewMap()
 	m.Items["b"] = float64(2)
 	m.Items["a"] = "one"
 	stringCases := map[Value]string{
-		nil:                 "nil",
-		true:                "true",
-		false:               "false",
-		float64(12):         "12",
-		float64(12.25):      "12.25",
-		math.Inf(1):         "+Inf",
-		"hello":             "hello",
-		list:                "[1, x, nil, true]",
-		m:                   "{a: one, b: 2}",
+		nil:                  "nil",
+		true:                 "true",
+		false:                "false",
+		int64(12):            "12",
+		float64(12):          "12",
+		float64(12.25):       "12.25",
+		math.Inf(1):          "+Inf",
+		"hello":              "hello",
+		list:                 "[1, x, nil, true]",
+		m:                    "{a: one, b: 2}",
 		&Function{Name: "f"}: "<fn f>",
 	}
 	for value, want := range stringCases {

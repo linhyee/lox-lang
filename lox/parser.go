@@ -543,10 +543,15 @@ func (this *Parser) finishCall(callee Expr) Expr {
 func (this *Parser) arrayLiteral() Expr {
 	bracket := this.previous()
 	var items []Expr
-	for {
-		items = append(items, this.assignment())
-		if !this.match(COMMA) {
-			break
+	if !this.check(RIGHT_BRACKET) {
+		for {
+			item := this.assignment()
+			if item != nil {
+				items = append(items, item)
+			}
+			if !this.match(COMMA) {
+				break
+			}
 		}
 	}
 	this.consume(RIGHT_BRACKET, "expected ']' after list items")

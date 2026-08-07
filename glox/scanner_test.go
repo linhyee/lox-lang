@@ -17,7 +17,7 @@ func scanAll(source string) []Token {
 func TestScannerTokensAndLiterals(t *testing.T) {
 	source := `(){}[],.-+;/*?! != = == > >= < <= ++ --
 and class const else export false fun for if nil or print return super this true var while break continue
-identifier _name abc123 123 45.67 "a\n\"b"`
+identifier _name abc123 123 45.67 1e3 1.5e-2 "a\n\"b"`
 	tokens := scanAll(source)
 	want := []TokenType{
 		TokenLeftParen, TokenRightParen, TokenLeftBrace, TokenRightBrace,
@@ -29,7 +29,7 @@ identifier _name abc123 123 45.67 "a\n\"b"`
 		TokenFun, TokenFor, TokenIf, TokenNil, TokenOr, TokenPrint, TokenReturn,
 		TokenSuper, TokenThis, TokenTrue, TokenVar, TokenWhile, TokenBreak, TokenContinue,
 		TokenIdentifier, TokenIdentifier, TokenIdentifier, TokenNumber, TokenNumber,
-		TokenString, TokenEOF,
+		TokenNumber, TokenNumber, TokenString, TokenEOF,
 	}
 	if len(tokens) != len(want) {
 		t.Fatalf("token count mismatch: want %d got %d: %#v", len(want), len(tokens), tokens)
@@ -39,14 +39,20 @@ identifier _name abc123 123 45.67 "a\n\"b"`
 			t.Fatalf("token %d type mismatch: want %v got %v (%q)", i, typ, tokens[i].Type, tokens[i].Lexeme)
 		}
 	}
-	if tokens[47].Literal != float64(123) {
+	if tokens[47].Literal != int64(123) {
 		t.Fatalf("number literal mismatch: %#v", tokens[47].Literal)
 	}
 	if tokens[48].Literal != float64(45.67) {
 		t.Fatalf("decimal literal mismatch: %#v", tokens[48].Literal)
 	}
-	if tokens[49].Literal != "a\n\"b" {
-		t.Fatalf("string literal mismatch: %#v", tokens[49].Literal)
+	if tokens[49].Literal != float64(1000) {
+		t.Fatalf("scientific literal mismatch: %#v", tokens[49].Literal)
+	}
+	if tokens[50].Literal != float64(0.015) {
+		t.Fatalf("scientific decimal literal mismatch: %#v", tokens[50].Literal)
+	}
+	if tokens[51].Literal != "a\n\"b" {
+		t.Fatalf("string literal mismatch: %#v", tokens[51].Literal)
 	}
 }
 

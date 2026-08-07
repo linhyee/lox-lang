@@ -291,7 +291,9 @@ c = "late";
 	vm.RegisterNativeModule("host", map[string]Value{
 		"name": "native",
 		"add": &NativeFunction{Name: "host.add", Arity: 2, Fn: func(vm *VM, args []Value) (Value, error) {
-			return args[0].(float64) + args[1].(float64), nil
+			left, _ := AsFloat64(args[0])
+			right, _ := AsFloat64(args[1])
+			return left + right, nil
 		}},
 	})
 

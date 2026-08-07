@@ -219,8 +219,10 @@ func (p *Parser) printStatement() {
 
 func (p *Parser) expressionStatement() {
 	p.expression()
-	p.consume(TokenSemicolon, "expect ';' after expression")
-	p.emitOp(OpPop)
+	if !p.match(TokenSemicolon) && !p.check(TokenEOF) {
+		p.errorAtCurrent("expect ';' after expression")
+	}
+	p.emitOp(OpPopResult)
 }
 
 func (p *Parser) ifStatement() {

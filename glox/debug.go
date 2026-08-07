@@ -245,4 +245,5 @@ var instructionTable = map[OpCode]InstructionInfo{
 	OpClass:             {"OP_CLASS", OperandConstant},
 	OpInherit:           {"OP_INHERIT", OperandNone},
 	OpMethod:            {"OP_METHOD", OperandConstant},
+	OpPopResult:         {"OP_POP_RESULT", OperandNone},
 }

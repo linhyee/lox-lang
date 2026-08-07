@@ -15,14 +15,14 @@ func (this *Environment) Define(name string, value interface{}) {
 }
 
 // Get get value from map
-func (this *Environment) Get(name *Token) interface{} {
+func (this *Environment) Get(name *Token) (interface{}, error) {
 	if v, ok := this.values[name.Lexeme]; ok {
-		return v
+		return v, nil
 	}
 	if this.enclosing != nil {
 		return this.enclosing.Get(name)
 	}
-	panic(NewRuntimeError(name, "get undefined variable '"+name.Lexeme+"'."))
+	return nil, NewRuntimeError(name, "get undefined variable '"+name.Lexeme+"'.")
 }
 
 // GetAt
@@ -40,16 +40,15 @@ func (this *Environment) ancestor(distance int) *Environment {
 }
 
 // Assign assign new value to variable
-func (this *Environment) Assign(name *Token, value interface{}) {
+func (this *Environment) Assign(name *Token, value interface{}) error {
 	if _, ok := this.values[name.Lexeme]; ok {
 		this.values[name.Lexeme] = value
-		return
+		return nil
 	}
 	if this.enclosing != nil {
-		this.enclosing.Assign(name, value)
-		return
+		return this.enclosing.Assign(name, value)
 	}
-	panic(NewRuntimeError(name, "set undefined variable '"+name.Lexeme+"'."))
+	return NewRuntimeError(name, "set undefined variable '"+name.Lexeme+"'.")
 }
 
 // AssignAt

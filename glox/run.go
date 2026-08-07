@@ -42,6 +42,8 @@ func (vm *VM) runUntil(targetFrames int) error {
 			vm.push(false)
 		case OpPop:
 			_ = vm.pop()
+		case OpPopResult:
+			vm.lastResult = vm.pop()
 		case OpDup:
 			vm.push(vm.peek(0))
 		case OpGetLocal:
@@ -149,11 +151,17 @@ func (vm *VM) runUntil(targetFrames int) error {
 			a := vm.pop()
 			vm.push(ValuesEqual(a, b))
 		case OpGreater:
-			if err := vm.binaryNumber(func(a, b float64) Value { return a > b }); err != nil {
+			if err := vm.binaryNumber(
+				func(a, b int64) Value { return a > b },
+				func(a, b float64) Value { return a > b },
+			); err != nil {
 				return err
 			}
 		case OpLess:
-			if err := vm.binaryNumber(func(a, b float64) Value { return a < b }); err != nil {
+			if err := vm.binaryNumber(
+				func(a, b int64) Value { return a < b },
+				func(a, b float64) Value { return a < b },
+			); err != nil {
 				return err
 			}
 		case OpAdd:
@@ -161,25 +169,43 @@ func (vm *VM) runUntil(targetFrames int) error {
 				return err
 			}
 		case OpSubtract:
-			if err := vm.binaryNumber(func(a, b float64) Value { return a - b }); err != nil {
+			if err := vm.binaryNumber(
+				func(a, b int64) Value { return a - b },
+				func(a, b float64) Value { return a - b },
+			); err != nil {
 				return err
 			}
 		case OpMultiply:
-			if err := vm.binaryNumber(func(a, b float64) Value { return a * b }); err != nil {
+			if err := vm.binaryNumber(
+				func(a, b int64) Value { return a * b },
+				func(a, b float64) Value { return a * b },
+			); err != nil {
 				return err
 			}
 		case OpDivide:
-			if err := vm.binaryNumber(func(a, b float64) Value { return a / b }); err != nil {
+			if err := vm.binaryNumber(
+				func(a, b int64) Value {
+					if b == 0 {
+						return nil
+					}
+					return a / b
+				},
+				func(a, b float64) Value { return a / b },
+			); err != nil {
 				return err
 			}
 		case OpNot:
 			vm.push(IsFalsey(vm.pop()))
 		case OpNegate:
-			value, ok := vm.pop().(float64)
-			if !ok {
+			value := vm.pop()
+			switch v := value.(type) {
+			case int64:
+				vm.push(-v)
+			case float64:
+				vm.push(-v)
+			default:
 				return vm.runtimeError("operand must be a number")
 			}
-			vm.push(-value)
 		case OpPrint:
 			fmt.Fprintln(vm.Stdout, Stringify(vm.pop()))
 		case OpJump:
@@ -410,30 +436,37 @@ func (vm *VM) setIndex() error {
 	return nil
 }
 
-func (vm *VM) binaryNumber(op func(float64, float64) Value) error {
-	right, okRight := vm.pop().(float64)
-	left, okLeft := vm.pop().(float64)
-	if !okLeft || !okRight {
+func (vm *VM) binaryNumber(intOp func(int64, int64) Value, floatOp func(float64, float64) Value) error {
+	right := vm.pop()
+	left := vm.pop()
+	result, ok := numericBinary(left, right, intOp, floatOp)
+	if !ok {
 		return vm.runtimeError("operands must be numbers")
 	}
-	vm.push(op(left, right))
+	if result == nil {
+		return vm.runtimeError("division by zero")
+	}
+	vm.push(result)
 	return nil
 }
 
 func (vm *VM) addValues() error {
 	right := vm.pop()
 	left := vm.pop()
-	if a, ok := left.(float64); ok {
-		if b, ok := right.(float64); ok {
-			vm.push(a + b)
-			return nil
-		}
-	}
 	if a, ok := left.(string); ok {
 		if b, ok := right.(string); ok {
 			vm.push(a + b)
 			return nil
 		}
+	}
+	if result, ok := numericBinary(
+		left,
+		right,
+		func(a, b int64) Value { return a + b },
+		func(a, b float64) Value { return a + b },
+	); ok {
+		vm.push(result)
+		return nil
 	}
 	return vm.runtimeError("operands must be two numbers or two strings")
 }

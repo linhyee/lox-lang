@@ -102,7 +102,9 @@ late = "late";
 	var errOut bytes.Buffer
 	vm := NewVM(Options{Stdout: &out, Stderr: &errOut, RootDir: dir})
 	vm.DefineNative("hostAdd", 2, func(vm *VM, args []Value) (Value, error) {
-		return args[0].(float64) + args[1].(float64), nil
+		left, _ := AsFloat64(args[0])
+		right, _ := AsFloat64(args[1])
+		return left + right, nil
 	})
 	err := vm.RunString(`
 var a = import("mod.lox");
@@ -167,10 +169,18 @@ func TestReplKeepsStateAndClearsDiagnostics(t *testing.T) {
 	}
 
 	errOut.Reset()
-	if err := vm.RunString(`a`); err == nil {
-		t.Fatal("expected missing semicolon compile error")
+	if result, err := vm.DoString(`a`); err != nil || result != int64(4) {
+		t.Fatalf("valid final expression without semicolon failed: result=%#v err=%v", result, err)
 	}
-	if got := errOut.String(); !strings.Contains(got, "expect ';' after expression") ||
+	if errOut.Len() != 0 {
+		t.Fatalf("expected no diagnostic for final expression, got:\n%s", errOut.String())
+	}
+
+	errOut.Reset()
+	if err := vm.RunString(`var`); err == nil {
+		t.Fatal("expected compile error")
+	}
+	if got := errOut.String(); !strings.Contains(got, "expect variable name") ||
 		strings.Contains(got, "undefined variable 'missing'") {
 		t.Fatalf("stale diagnostic leaked into compile error:\n%s", got)
 	}

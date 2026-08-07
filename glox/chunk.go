@@ -49,6 +49,7 @@ const (
 	OpClass
 	OpInherit
 	OpMethod
+	OpPopResult
 )
 
 type Chunk struct {

@@ -103,7 +103,7 @@ func unary(p *Parser, canAssign bool) {
 			p.error("cannot assign to const '" + name.Lexeme + "'")
 		}
 		p.emitBytes(byte(getOp), arg)
-		p.emitConstant(float64(1))
+		p.emitConstant(int64(1))
 		if operatorType == TokenPlusPlus {
 			p.emitOp(OpAdd)
 		} else {

@@ -36,6 +36,8 @@ type VM struct {
 
 	globals     *Environment
 	replModule  *Module
+	lastModule  *Module
+	lastResult  Value
 	Loader      *ModuleLoader
 	Diagnostics *Diagnostics
 	Stdout      io.Writer
@@ -80,6 +82,11 @@ func (vm *VM) RunString(source string) error {
 	return vm.Interpret(source, "repl")
 }
 
+func (vm *VM) DoString(source string) (Value, error) {
+	err := vm.RunString(source)
+	return vm.lastResult, err
+}
+
 func (vm *VM) RunFile(path string) error {
 	source, err := os.ReadFile(path)
 	if err != nil {
@@ -88,9 +95,39 @@ func (vm *VM) RunFile(path string) error {
 	return vm.Interpret(string(source), path)
 }
 
+func (vm *VM) DoFile(path string) (Value, error) {
+	err := vm.RunFile(path)
+	return vm.lastResult, err
+}
+
+func (vm *VM) GetGlobal(name string) (Value, bool) {
+	if vm.lastModule != nil {
+		if value, ok := vm.lastModule.Env.GetOwn(name); ok {
+			return value, true
+		}
+	}
+	if vm.replModule != nil {
+		if value, ok := vm.replModule.Env.GetOwn(name); ok {
+			return value, true
+		}
+	}
+	return vm.globals.GetOwn(name)
+}
+
+func (vm *VM) SetGlobal(name string, value Value) {
+	if vm.replModule == nil {
+		vm.replModule = NewModule("repl")
+		vm.replModule.State = ModuleInitialized
+		vm.Loader.loaded["repl"] = vm.replModule
+	}
+	vm.replModule.Env.Define(name, value, false)
+	vm.lastModule = vm.replModule
+}
+
 func (vm *VM) Interpret(source, path string) error {
 	vm.Diagnostics.Reset()
 	vm.resetStack()
+	vm.lastResult = nil
 	resolved := path
 	var module *Module
 	if path == "repl" {
@@ -126,6 +163,7 @@ func (vm *VM) Interpret(source, path string) error {
 		module.State = ModuleFailed
 		return err
 	}
+	vm.lastModule = module
 	return nil
 }
 
@@ -441,12 +479,12 @@ func (vm *VM) assignGlobal(name string, value Value, module *Module) error {
 }
 
 func numberToIndex(value Value, limit int) (int, bool) {
-	number, ok := value.(float64)
+	number, ok := AsInt64(value)
 	if !ok {
 		return 0, false
 	}
 	index := int(number)
-	if float64(index) != number || index < 0 || index >= limit {
+	if int64(index) != number || index < 0 || index >= limit {
 		return 0, false
 	}
 	return index, true

@@ -25,15 +25,15 @@ func (vm *VM) defineBuiltins() {
 	vm.DefineNative("len", 1, func(vm *VM, args []Value) (Value, error) {
 		switch v := args[0].(type) {
 		case string:
-			return float64(utf8.RuneCountInString(v)), nil
+			return int64(utf8.RuneCountInString(v)), nil
 		case *List:
-			return float64(len(v.Items)), nil
+			return int64(len(v.Items)), nil
 		case *Map:
-			return float64(len(v.Items)), nil
+			return int64(len(v.Items)), nil
 		case *Module:
-			return float64(len(v.Exports)), nil
+			return int64(len(v.Exports)), nil
 		default:
-			return float64(0), nil
+			return int64(0), nil
 		}
 	})
 	vm.DefineNative("type", 1, func(vm *VM, args []Value) (Value, error) {
@@ -67,6 +67,8 @@ func typeName(value Value) string {
 		return "boolean"
 	case float64:
 		return "number"
+	case int64:
+		return "number"
 	case string:
 		return "string"
 	case *Function, *Closure, *BoundMethod:
@@ -92,7 +94,7 @@ func (vm *VM) mapMethod(receiver *Map, name string) Value {
 	switch name {
 	case "size":
 		return &BoundNativeFunction{Receiver: receiver, Native: &NativeFunction{Name: "Map.size", Arity: 0, Fn: func(vm *VM, args []Value) (Value, error) {
-			return float64(len(args[0].(*Map).Items)), nil
+			return int64(len(args[0].(*Map).Items)), nil
 		}}}
 	case "keys":
 		return &BoundNativeFunction{Receiver: receiver, Native: &NativeFunction{Name: "Map.keys", Arity: 0, Fn: func(vm *VM, args []Value) (Value, error) {
@@ -146,7 +148,7 @@ func (vm *VM) listMethod(receiver *List, name string) Value {
 		}}}
 	case "size":
 		return &BoundNativeFunction{Receiver: receiver, Native: &NativeFunction{Name: "List.size", Arity: 0, Fn: func(vm *VM, args []Value) (Value, error) {
-			return float64(len(args[0].(*List).Items)), nil
+			return int64(len(args[0].(*List).Items)), nil
 		}}}
 	case "insertAt":
 		return &BoundNativeFunction{Receiver: receiver, Native: &NativeFunction{Name: "List.insertAt", Arity: 2, Fn: func(vm *VM, args []Value) (Value, error) {

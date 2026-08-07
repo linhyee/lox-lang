@@ -157,17 +157,41 @@ func (s *Scanner) identifier() Token {
 }
 
 func (s *Scanner) number() Token {
+	isFloat := false
 	for unicode.IsDigit(s.peek()) {
 		s.advance()
 	}
 	if s.peek() == '.' && unicode.IsDigit(s.peekNext()) {
+		isFloat = true
 		s.advance()
 		for unicode.IsDigit(s.peek()) {
 			s.advance()
 		}
 	}
+	if s.peek() == 'e' || s.peek() == 'E' {
+		if unicode.IsDigit(s.peekExponentDigit()) {
+			isFloat = true
+			s.advance()
+			if s.peek() == '+' || s.peek() == '-' {
+				s.advance()
+			}
+			for unicode.IsDigit(s.peek()) {
+				s.advance()
+			}
+		}
+	}
 	token := s.makeToken(TokenNumber)
-	value, _ := strconv.ParseFloat(token.Lexeme, 64)
+	if isFloat {
+		value, _ := strconv.ParseFloat(token.Lexeme, 64)
+		token.Literal = value
+		return token
+	}
+	value, err := strconv.ParseInt(token.Lexeme, 10, 64)
+	if err != nil {
+		floatValue, _ := strconv.ParseFloat(token.Lexeme, 64)
+		token.Literal = floatValue
+		return token
+	}
 	token.Literal = value
 	return token
 }
@@ -252,6 +276,26 @@ func (s *Scanner) peekNext() rune {
 		return 0
 	}
 	ch, _ := utf8.DecodeRuneInString(s.source[next:])
+	return ch
+}
+
+func (s *Scanner) peekExponentDigit() rune {
+	if s.isAtEnd() {
+		return 0
+	}
+	_, size := utf8.DecodeRuneInString(s.source[s.current:])
+	next := s.current + size
+	if next >= len(s.source) {
+		return 0
+	}
+	ch, size := utf8.DecodeRuneInString(s.source[next:])
+	if ch == '+' || ch == '-' {
+		next += size
+		if next >= len(s.source) {
+			return 0
+		}
+		ch, _ = utf8.DecodeRuneInString(s.source[next:])
+	}
 	return ch
 }
 
