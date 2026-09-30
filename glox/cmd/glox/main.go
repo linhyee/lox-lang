@@ -9,12 +9,8 @@ import (
 )
 
 func main() {
-	vm := glox.NewVM(glox.Options{})
-	if len(os.Args) > 2 {
-		fmt.Fprintln(os.Stderr, "usage: glox [script]")
-		os.Exit(64)
-	}
-	if len(os.Args) == 2 {
+	if len(os.Args) >= 2 {
+		vm := glox.NewVM(glox.Options{Args: os.Args[2:]})
 		if err := vm.RunFile(os.Args[1]); err != nil {
 			if !isReported(err) {
 				fmt.Fprintln(os.Stderr, err)
@@ -24,6 +20,7 @@ func main() {
 		return
 	}
 
+	vm := glox.NewVM(glox.Options{})
 	reader := bufio.NewScanner(os.Stdin)
 	for {
 		fmt.Print("> ")

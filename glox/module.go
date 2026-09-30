@@ -88,7 +88,7 @@ func (l *ModuleLoader) RegisterNativeModule(name string, exports map[string]Valu
 }
 
 func (l *ModuleLoader) Import(request string, caller *Module, line int) (*Module, error) {
-	if module, ok := l.nativeModules[request]; ok {
+	if module, ok := l.nativeModule(request); ok {
 		return module, nil
 	}
 
@@ -139,19 +139,35 @@ func (l *ModuleLoader) Import(request string, caller *Module, line int) (*Module
 	return module, nil
 }
 
+func (l *ModuleLoader) RegisterNativeModuleAlias(alias string, module *Module) {
+	l.nativeModules[filepath.ToSlash(alias)] = module
+	l.loaded["native:"+filepath.ToSlash(alias)] = module
+}
+
+func (l *ModuleLoader) nativeModule(request string) (*Module, bool) {
+	if module, ok := l.nativeModules[request]; ok {
+		return module, true
+	}
+	module, ok := l.nativeModules[filepath.ToSlash(request)]
+	return module, ok
+}
+
 func (l *ModuleLoader) Resolve(request string, caller *Module) (string, error) {
 	candidates := l.candidates(request, caller)
 	for _, candidate := range candidates {
-		abs, err := filepath.Abs(candidate)
-		if err != nil {
-			continue
-		}
-		abs = filepath.Clean(abs)
-		if _, err := os.Stat(abs); err == nil {
-			if real, err := filepath.EvalSymlinks(abs); err == nil {
-				abs = real
+		for _, fileCandidate := range moduleFileCandidates(candidate) {
+			abs, err := filepath.Abs(fileCandidate)
+			if err != nil {
+				continue
 			}
-			return filepath.Clean(abs), nil
+			abs = filepath.Clean(abs)
+			info, err := os.Stat(abs)
+			if err == nil && !info.IsDir() {
+				if real, err := filepath.EvalSymlinks(abs); err == nil {
+					abs = real
+				}
+				return filepath.Clean(abs), nil
+			}
 		}
 	}
 	if len(candidates) == 0 {
@@ -162,6 +178,14 @@ func (l *ModuleLoader) Resolve(request string, caller *Module) (string, error) {
 		return "", err
 	}
 	return filepath.Clean(abs), nil
+}
+
+func moduleFileCandidates(candidate string) []string {
+	clean := filepath.Clean(candidate)
+	if filepath.Ext(clean) != "" {
+		return []string{clean}
+	}
+	return []string{clean, clean + ".lox"}
 }
 
 func (l *ModuleLoader) candidates(request string, caller *Module) []string {

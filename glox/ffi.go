@@ -57,6 +57,7 @@ func (vm *VM) defineBuiltins() {
 		}
 		return vm.Loader.Import(path, caller, line)
 	})
+	vm.defineStdlibModules()
 }
 
 func typeName(value Value) string {

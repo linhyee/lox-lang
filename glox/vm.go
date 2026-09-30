@@ -16,6 +16,7 @@ type Options struct {
 	Stderr              io.Writer
 	RootDir             string
 	ModulePaths         []string
+	Args                []string
 	DebugWriter         io.Writer
 	DebugDisassemble    bool
 	DebugTraceExecution bool
@@ -42,6 +43,7 @@ type VM struct {
 	Diagnostics *Diagnostics
 	Stdout      io.Writer
 	Stderr      io.Writer
+	Args        []string
 	debug       *Disassembler
 
 	debugDisassemble    bool
@@ -68,6 +70,7 @@ func NewVM(options Options) *VM {
 		Diagnostics: NewDiagnostics(stderr),
 		Stdout:      stdout,
 		Stderr:      stderr,
+		Args:        append([]string(nil), options.Args...),
 		debug:       NewDisassembler(debugWriter),
 
 		debugDisassemble:    options.DebugDisassemble,
